@@ -77,7 +77,10 @@
         
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; margin-bottom: 15px; page-break-inside: auto; }
         tr { page-break-inside: avoid; page-break-after: auto; }
-        th { background-color: #1A1A1A; color: white; padding: 9px 10px; font-weight: 600; border: 1px solid #333; text-align: center; letter-spacing: 0.3px; }
+        
+        /* MONOCHROME HIGH-CONTRAST SCREEN DEFAULT FOR THEAD OVERRIDES */
+        th { background-color: #FFFFFF; color: #000000; padding: 9px 10px; font-weight: 600; border: 1px solid #000000; text-align: center; letter-spacing: 0.3px; }
+        
         td { padding: 9px 10px; border: 1px solid #DDD; vertical-align: top; }
         td.text-right, th.text-right { text-align: right; }
         table tbody tr:nth-child(even) { background-color: #FAFBFC; }
@@ -224,49 +227,31 @@
         .receipt-counterpart { margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
         .receipt-title { text-align: center; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; color: #000; }
 
-@media print {
-            /* 1. Reset base canvas to strict white */
-            html, body, .container {
+        /* ==========================================================================
+           UNIVERSAL MONOCHROME HIGH-CONTRAST PRINT OVERRIDE
+           ========================================================================== */
+        @media print {
+            /* Force base layout canvas to absolute white */
+            html, body, .container, .master-doc-output, .slips-output, .a4-page, .a4-page-slip-wrapper {
                 background: #FFFFFF !important;
                 background-color: #FFFFFF !important;
                 color: #000000 !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
                 color-adjust: exact !important;
             }
 
-            /* 2. Hide all non-printable UI controls */
+            /* Hide interactive UI elements completely */
             .form-container, .meta-container, .table-container, header, .section-title, .btn-group, .btn-print-direct { 
                 display: none !important; 
             }
 
-            /* 3. Setup core print wrappers */
-            .master-doc-output, .slips-output { 
-                border: none !important; 
-                box-shadow: none !important; 
-                padding: 0 !important; 
-                display: block !important; 
-                background: #FFFFFF !important;
-            }
-            .a4-page { 
-                border: none !important; 
-                margin: 0 !important; 
-                width: 100% !important; 
-                background: #FFFFFF !important; 
-            }
-            .a4-page-slip-wrapper { 
-                border: none !important; 
-                margin: 0 !important; 
-                padding-left: 14mm !important; 
-                width: 100% !important; 
-                height: 100% !important; 
-                background: #FFFFFF !important; 
-            }
-
-            /* 4. FORCE EVERY SINGLE SUB-ELEMENT TO BLACK TEXT & WHITE BACKGROUND */
-            .a4-page *, .a4-slip-compressed *, .a4-page-slip-wrapper * {
+            /* FORCE EVERYTHING INSIDE GENERATED OUTPUT TO BLACK TEXT, SOLID LINES & WHITE FILL */
+            * {
                 color: #000000 !important;
                 background: #FFFFFF !important;
                 background-color: #FFFFFF !important;
@@ -275,21 +260,29 @@
                 box-shadow: none !important;
             }
 
-            /* 5. Force borders and structural lines to solid black */
-            table, th, td, .slip-table, .slip-table th, .slip-table td {
+            /* Explicit structural framework rules */
+            table, th, td, tr, .slip-table, .slip-table th, .slip-table td {
                 border: 1px solid #000000 !important;
                 background: #FFFFFF !important;
                 background-color: #FFFFFF !important;
+                color: #000000 !important;
             }
             
-            /* Remove background tints from specific components */
+            table tbody tr:nth-child(even) { 
+                background: #FFFFFF !important; 
+                background-color: #FFFFFF !important; 
+            }
+            
+            /* Remove block color panels from metadata blocks and badges */
             .doc-meta, .slip-ref-block, .fund-group-header, .slip-banner { 
                 background: #FFFFFF !important; 
                 background-color: #FFFFFF !important; 
-                border: 2px solid #000000 !important; 
+                border: 1px solid #000000 !important; 
+                border-left: 1px solid #000000 !important;
+                color: #000000 !important;
             }
             
-            /* Fix dotted lines and small markers */
+            /* Dotted alignment borders and punch indicators */
             .slip-value { 
                 border-bottom: 1px dotted #000000 !important; 
             }
@@ -300,16 +293,8 @@
             }
             .record-stamp, .audit-footer, .school-header-sub { 
                 border-color: #000000 !important; 
+                color: #000000 !important;
             }
-        
-            
-            /* Clear out any subtle shades or header accents completely */
-            th, .slip-table th { background: #FFFFFF !important; background-color: #FFFFFF !important; border: 1px solid #000000 !important; }
-            table tbody tr:nth-child(even) { background: #FFFFFF !important; background-color: #FFFFFF !important; }
-            .doc-meta, .slip-ref-block, .fund-group-header, .slip-banner { background: #FFFFFF !important; background-color: #FFFFFF !important; border: 2px solid #000000 !important; }
-            .record-stamp, .audit-footer, .school-header-sub { border-color: #000000 !important; }
-            .binding-gutter span { background: #FFFFFF !important; border: 1px solid #000000 !important; }
-            .slip-value { border-bottom: 1px dotted #000000 !important; }
         }
     </style>
 </head>
@@ -321,7 +306,6 @@
         <p>Institutional Administration Module — Comprehensive A4 Formatting Suite</p>
     </header>
 
-    <!-- STEP 1: TRANSACTION ENTRY FORM -->
     <div class="section-title">✍️ Step 1: Add Fund Entries (Incrementally)</div>
     <div class="form-container">
         <form id="ledgerForm" onsubmit="saveEntry(event)">
@@ -343,7 +327,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="bankAcc">Bank Account No.</label>
+                    <label voor="bankAcc">Bank Account No.</label>
                     <input type="text" id="bankAcc" readonly placeholder="Auto-filled">
                 </div>
                 <div class="form-group">
@@ -425,7 +409,6 @@
         </form>
     </div>
 
-    <!-- BATCH ENTRY SUMMARY VISUALIZER -->
     <div class="section-title">📋 Step 2: Session Entry Log Verification</div>
     <div class="table-container">
         <table>
@@ -448,7 +431,6 @@
         </table>
     </div>
 
-    <!-- STEP 3: DYNAMIC BATCH METADATA ENTRIES -->
     <div class="section-title">📝 Step 3: Global Reference Configuration & Compilation</div>
     <div class="meta-container">
         <div class="form-grid">
@@ -490,13 +472,11 @@
         </div>
     </div>
 
-    <!-- MASTER DOCUMENT PRINT SUITE -->
     <div id="masterDocumentSuite" class="master-doc-output">
         <button class="btn btn-print-direct" onclick="window.print()">🖨️ Print Document Suite</button>
         <div id="suiteInnerContainer"></div>
     </div>
 
-    <!-- PAY ORDER PRINT SUITE -->
     <div id="payOrderSlipsSuite" class="slips-output">
         <button class="btn btn-print-direct" onclick="window.print()">🖨️ Print Pay Slips</button>
         <div id="slipsInnerContainer"></div>
@@ -649,9 +629,6 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
-    // SCALE-TO-FIT ENGINE: forces content to stay strictly within one physical A4 box.
-    // If natural content height exceeds the box, the content is proportionally shrunk
-    // (never allowed to spill onto another page). minScale sets a legibility floor.
     function shrinkToFit(fitEl, boxEl, minScale, reservePx) {
         if (!fitEl || !boxEl) return;
         fitEl.style.transform = "none";
@@ -686,7 +663,6 @@
         });
     }
 
-    // PATH A: GENERATE RESOLUTION DOC SUITE STAGE (EXACTLY 4 SEPARATE A4 MODULES)
     function compileConsolidatedSuite() {
         document.getElementById("payOrderSlipsSuite").style.display = "none";
         const container = document.getElementById("suiteInnerContainer");
@@ -826,7 +802,7 @@
         </div>`;
         container.innerHTML += page3;
 
-        // --- PAGE 4: ADMINISTRATOR APPROVAL ORDER (WITH TOTALS & REF LABELS) ---
+        // --- PAGE 4: ADMINISTRATOR APPROVAL ORDER ---
         let adminTablesContent = "";
         for (const fundName in grouped) {
             const items = grouped[fundName];
@@ -837,7 +813,6 @@
                 fundTotal += parseFloat(item.amount);
                 adminTablesContent += `<tr><td style="text-align:center;">${index + 1}</td><td>${item.payee}</td><td>As noted in HOI report</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>${item.amount}</strong></td></tr>`;
             });
-            // Append explicit fundwise summary line row
             adminTablesContent += `<tr style="background:#f9f9f9; font-weight:bold;"><td colspan="6" style="text-align:right;">Fund head Consolidated Total (${fundName}):</td><td class="text-right">₹${fundTotal.toFixed(2)}</td></tr>`;
             adminTablesContent += `</tbody></table>`;
         }
@@ -872,7 +847,6 @@
         document.getElementById("masterDocumentSuite").scrollIntoView({ behavior: 'smooth' });
     }
 
-    // PATH B: PRINTER PAY ORDER SLIPS STAGE (RIGIDLY 2 SLIPS PER A4 PAGE)
     function compilePayOrderSlips() {
         document.getElementById("masterDocumentSuite").style.display = "none";
         const slipsContainer = document.getElementById("slipsInnerContainer");
@@ -883,7 +857,6 @@
         const adminOrderNo = document.getElementById("metaAdminNo").value || "________";
         const adminDateVal = formatDate(document.getElementById("metaAdminDate").value);
 
-        // Step through batch registry in increments of 2
         for (let i = 0; i < sessionEntries.length; i += 2) {
             let pageWrapper = document.createElement("div");
             pageWrapper.className = "a4-page-slip-wrapper";
@@ -892,7 +865,6 @@
             for (let j = 0; j < 2; j++) {
                 const entryIndex = i + j;
                 
-                // Force blank spacer partition padding if entries count ends on odd number (e.g. 3, 5 tokens)
                 if (entryIndex >= sessionEntries.length) {
                     let blankBlock = document.createElement("div");
                     blankBlock.className = "a4-slip-blank";

@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office Ledger & Document Generator Suite</title>
+    <style>
+        :root {
+            --primary-color: #0B2545;
+            --secondary-color: #134074;
+            --accent-color: #EEB902;
+            --bg-color: #F4F6F9;
+            --card-bg: #FFFFFF;
+            --border-color: #E2E8F0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        header h1 { margin: 0; font-size: 24px; }
+        header p { margin: 5px 0 0 0; color: var(--accent-color); font-size: 14px; }
+
+        .form-container, .meta-container {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group { display: flex; flex-direction: column; }
+        .form-group.full-width { grid-column: span 2; }
+
+        label { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--secondary-color); }
+        input, select, textarea { padding: 10px; font-size: 14px; border: 1px solid #CBD5E1; border-radius: 4px; background-color: #FFF; }
+        input[readonly] { background-color: #F1F5F9; color: #64748B; cursor: not-allowed; }
+
+        .conditional-box { display: none; margin-top: 10px; }
+
+        .btn-group { display: flex; gap: 15px; justify-content: flex-end; }
+        .btn { padding: 12px 24px; font-size: 14px; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background-color: var(--secondary-color); color: white; }
+        .btn-secondary { background-color: #E2E8F0; color: #475569; }
+        
+        .btn-suite { background-color: #2980B9; color: white; flex: 1; }
+        .btn-slips { background-color: #27AE60; color: white; flex: 1; }
+        .btn-print-direct { background-color: #E67E22; color: white; margin-bottom: 20px; width: 100%; }
+        .btn-suite:disabled, .btn-slips:disabled { background-color: #BDC3C7; cursor: not-allowed; }
+
+        .section-title { font-size: 18px; color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-top: 40px; margin-bottom: 15px; font-weight: 600; }
+        .table-container { background: var(--card-bg); border-radius: 8px; overflow-x: auto; margin-bottom: 25px; }
+        
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; margin-bottom: 15px; page-break-inside: auto; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        th { background-color: #1A1A1A; color: white; padding: 9px 10px; font-weight: 600; border: 1px solid #333; text-align: center; letter-spacing: 0.3px; }
+        td { padding: 9px 10px; border: 1px solid #DDD; vertical-align: top; }
+        td.text-right, th.text-right { text-align: right; }
+        table tbody tr:nth-child(even) { background-color: #FAFBFC; }
+
+        /* Master Outputs styling */
+        .master-doc-output, .slips-output { background: white; border: 2px solid #333; border-radius: 8px; padding: 40px; margin-top: 35px; display: none; }
+        
+        /* Rigid A4 Page Framework rules — with binding gutter for physical file record */
+        .a4-page {
+            width: 210mm;
+            height: 297mm;
+            padding: 18mm 20mm 16mm 32mm;
+            margin: 0 auto 30px auto;
+            border: 1px dashed #7f8c8d;
+            box-sizing: border-box;
+            background: #fff;
+            page-break-after: always;
+            page-break-inside: avoid;
+            position: relative;
+            overflow: hidden;
+            color: #111;
+        }
+        .a4-page:last-child { page-break-after: avoid; }
+        .a4-fit { transform-origin: top left; }
+
+        /* Binding gutter: punch-hole markers along the left edge for physical file binding */
+        .binding-gutter {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 20mm;
+            border-right: 1px dashed #B9C2CC;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-evenly;
+        }
+        .binding-gutter span {
+            width: 9px; height: 9px;
+            border-radius: 50%;
+            border: 1px solid #9AA5B1;
+            background: #FBFCFD;
+        }
+
+        .record-stamp {
+            position: absolute;
+            top: 8mm; right: 20mm;
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #8A94A0;
+            font-weight: 600;
+        }
+
+        .audit-footer {
+            position: absolute;
+            bottom: 8mm; left: 32mm; right: 20mm;
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #8A94A0;
+            border-top: 1px solid #E2E8F0;
+            padding-top: 4px;
+        }
+
+        .doc-body-text { text-align: justify; line-height: 1.55; }
+
+        /* Pay slip container splits page in exactly two balanced blocks */
+        .a4-page-slip-wrapper {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            box-sizing: border-box;
+            page-break-after: always;
+            page-break-inside: avoid;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            padding-left: 14mm;
+            overflow: hidden;
+        }
+        .a4-page-slip-wrapper:last-child { page-break-after: avoid; }
+        .a4-page-slip-wrapper .binding-gutter { width: 14mm; border-right: 1px dashed #B9C2CC; }
+
+        .a4-slip-compressed {
+            height: 148mm;
+            border: 2px solid #000;
+            padding: 15px 25px;
+            box-sizing: border-box;
+            background: #fff;
+            color: #000;
+            overflow: hidden;
+            position: relative;
+        }
+        .slip-fit {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transform-origin: top left;
+            height: 100%;
+        }
+        .a4-slip-blank {
+            height: 148mm;
+            border: 1px dashed #ccc;
+            box-sizing: border-box;
+            background: #fafafa;
+        }
+
+        .doc-title { text-align: center; text-transform: uppercase; font-size: 17px; font-weight: bold; letter-spacing: 0.6px; text-decoration: underline; margin-bottom: 16px; color: #0B2545; }
+        .doc-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin-bottom: 18px; font-weight: 600; font-size: 12.5px; background: #F7F9FB; padding: 10px 14px; border: 1px solid #0B2545; border-radius: 3px; color: #0B2545; }
+        .doc-meta > div { border-bottom: 1px dotted #B9C2CC; padding-bottom: 3px; }
+        .fund-group-header { background: #F2F2F2; color: #000; font-weight: bold; padding: 6px 10px; font-size: 13px; border: 1px solid #000; border-left: 5px solid #0B2545; margin-top: 15px; margin-bottom: 8px; text-transform: uppercase; }
+        .doc-footer { margin-top: 25px; display: flex; justify-content: space-between; font-weight: 600; font-size: 13px; }
+
+        .slip-banner-wrap { text-align: center; margin-bottom: 6px; }
+        .slip-banner {
+            display: inline-block;
+            padding: 4px 30px;
+            border: 2px solid #000;
+            border-radius: 50% / 100%;
+            background: #FAF7EF;
+            color: #000;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+        }
+        .school-header-title { text-align: center; font-size: 16px; font-weight: bold; text-transform: uppercase; margin-bottom: 1px; color: #000; }
+        .school-header-sub { text-align: center; font-size: 11px; font-weight: 600; margin-bottom: 8px; border-bottom: 2px solid #000; padding-bottom: 4px; color: #333; }
+        
+        .slip-ref-block { background: #F7F9FB; border: 1px solid #0B2545; border-radius: 3px; padding: 6px 10px; margin-bottom: 8px; color: #000; }
+        .slip-ref-line { font-size: 11.5px; }
+        .slip-ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; font-size: 10.5px; margin-top: 3px; padding-top: 3px; border-top: 1px dotted #B9C2CC; }
+
+        .slip-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; }
+        .slip-label { font-weight: bold; width: 160px; }
+        .slip-value { flex-grow: 1; border-bottom: 1px dotted #000; padding-left: 5px; }
+        
+        .slip-table { width: 100%; margin-top: 8px; border: 1px solid #000; border-collapse: collapse; }
+        .slip-table th, .slip-table td { border: 1px solid #000; padding: 5px 8px; font-size: 11px; color: #000; }
+        .slip-table th { background-color: #E6E6E6; }
+
+        .receipt-counterpart { margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
+        .receipt-title { text-align: center; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; color: #000; }
+
+        @media print {
+            html, body {
+                background: white;
+                padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            .form-container, .meta-container, .table-container, header, .section-title, .btn-group, .btn-print-direct { display: none !important; }
+            .master-doc-output, .slips-output { border: none; box-shadow: none; padding: 0; display: block !important; }
+            .a4-page { border: none; margin: 0; width: 100%; }
+            .a4-page-slip-wrapper { border: none; margin: 0; padding-left: 14mm; width: 100%; height: 100%; }
+
+            /* PRINTER-FRIENDLY OVERRIDE — safe for B/W and colour printers alike:
+               all ink is forced to solid black text on white/light-grey fills so
+               nothing depends on colour rendering or background-graphics being on. */
+            .a4-page, .a4-page *, .a4-slip-compressed, .a4-slip-compressed *,
+            .a4-page-slip-wrapper, .a4-page-slip-wrapper * {
+                color: #000 !important;
+                text-shadow: none !important;
+                box-shadow: none !important;
+            }
+            th { background-color: #E6E6E6 !important; }
+            table tbody tr:nth-child(even) { background-color: #F4F4F4 !important; }
+            .doc-meta, .slip-ref-block { background: #FFFFFF !important; border-color: #000 !important; }
+            .fund-group-header { background: #F2F2F2 !important; border-color: #000 !important; }
+            .slip-banner { background: #FFFFFF !important; border-color: #000 !important; }
+            .record-stamp, .audit-footer, .school-header-sub { border-color: #000 !important; }
+            .binding-gutter span { background: #FFFFFF !important; border-color: #000 !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Fund Allocation & Office Output Suite</h1>
+        <p>Institutional Administration Module — Comprehensive A4 Formatting Suite</p>
+    </header>
+
+    <!-- STEP 1: TRANSACTION ENTRY FORM -->
+    <div class="section-title">✍️ Step 1: Add Fund Entries (Incrementally)</div>
+    <div class="form-container">
+        <form id="ledgerForm" onsubmit="saveEntry(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="fundSelect">Select Fund Head</label>
+                    <select id="fundSelect" onchange="updateAccountDetails()" required>
+                        <option value="" disabled selected>-- Choose Fund --</option>
+                        <option value="MDM">MDM (Mid-Day Meal)</option>
+                        <option value="VOCATIONAL">VOCATIONAL (Voc Fund)</option>
+                        <option value="SSM">SSM</option>
+                        <option value="GENERAL">GENERAL (Gen Fund)</option>
+                        <option value="DEVELOPMENT">DEVELOPMENT (Dev)</option>
+                        <option value="HOSTEL">HOSTEL (Hostel Fund)</option>
+                        <option value="MANUAL">-- Manual / Other Fund Head --</option>
+                    </select>
+                    <div id="manualFundBox" class="conditional-box">
+                        <input type="text" id="manualFundInput" placeholder="Enter custom fund head name">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="bankAcc">Bank Account No.</label>
+                    <input type="text" id="bankAcc" readonly placeholder="Auto-filled">
+                </div>
+                <div class="form-group">
+                    <label for="bankName">Bank Branch Name</label>
+                    <input type="text" id="bankName" readonly placeholder="Auto-filled">
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="payeeSelect">Payee Name Target</label>
+                    <select id="payeeSelect" onchange="togglePayeeInput()" required>
+                        <option value="" disabled selected>-- Select Payee --</option>
+                        <option value="Sital Chhaya Mahila SGSY">Sital Chhaya Mahila SGSY</option>
+                        <option value="Subhadip Chakraborty">Subhadip Chakraborty</option>
+                        <option value="Tribhanga Khan">Tribhanga Khan</option>
+                        <option value="Kishor Ghosh">Kishor Ghosh</option>
+                        <option value="Friends Offset Printing">Friends Offset Printing</option>
+                        <option value="Soumen Nandi">Soumen Nandi (Sikshasathi)</option>
+                        <option value="Ramprasad Layek">Ramprasad Layek</option>
+                        <option value="Through Bank Transfer">Through Bank (Direct Transfer)</option>
+                        <option value="To Various Payees through HM">To Various Payees through HM</option>
+                        <option value="MANUAL">-- Manual / Other Payee --</option>
+                    </select>
+                    <div id="manualPayeeBox" class="conditional-box">
+                        <input type="text" id="manualPayeeInput" placeholder="Enter custom payee name">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="chqType">Cheque Mode Type</label>
+                    <select id="chqType" onchange="toggleChqTypeInput()" required>
+                        <option value="A/C Payee Only">A/C Payee Only</option>
+                        <option value="Bearer">Bearer</option>
+                        <option value=" ">Blank / None</option>
+                        <option value="MANUAL">-- Manual / Other --</option>
+                    </select>
+                    <div id="manualChqTypeBox" class="conditional-box">
+                        <input type="text" id="manualChqTypeInput" placeholder="Enter custom cheque type text">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="chqNo">Cheque / Reference No.</label>
+                    <input type="text" id="chqNo" placeholder="Enter Reference No." required>
+                </div>
+                <div class="form-group">
+                    <label for="chqDate">Cheque Allocation Date</label>
+                    <input type="date" id="chqDate" required>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="expAmount">Disbursed Outflow (₹)</label>
+                    <input type="number" id="expAmount" step="0.01" placeholder="0.00" required>
+                </div>
+                <div class="form-group full-width">
+                    <label for="purposeSelect">Purpose Description Head</label>
+                    <select id="purposeSelect" onchange="togglePurposeInput()" required>
+                        <option value="" disabled selected>-- Select Purpose --</option>
+                        <option value="Administrative Staff Honorarium">Administrative Staff Honorarium</option>
+                        <option value="Other Recurring Expenses">Other Recurring Expenses (Training materials, Electricity, Office expenses)</option>
+                        <option value="MDM Cooking Materials">MDM Cooking Materials (Vegetable, Egg)</option>
+                        <option value="MDM Cooking Fuel">MDM Cooking Materials (Firewood)</option>
+                        <option value="SHG Honorarium">Honorarium SHG Cooking Staff</option>
+                        <option value="Printing Question Papers">Question Paper Printing & Xerox Paper Bill</option>
+                        <option value="Office Stationery Dues">Office Stationery Annual Due Settlement</option>
+                        <option value="MANUAL">-- Manual / Other Purpose --</option>
+                    </select>
+                    <div id="manualPurposeBox" class="conditional-box">
+                        <textarea id="manualPurposeInput" rows="2" placeholder="Enter custom description..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button type="button" class="btn btn-secondary" onclick="clearForm()">Reset Entry Fields</button>
+                <button type="submit" class="btn btn-primary">Save Entry to Batch Head</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- BATCH ENTRY SUMMARY VISUALIZER -->
+    <div class="section-title">📋 Step 2: Session Entry Log Verification</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fund Category</th>
+                    <th>Linked Account</th>
+                    <th>Payee</th>
+                    <th>Cheque Mode</th>
+                    <th>Cheque No</th>
+                    <th>Date</th>
+                    <th class="text-right">Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody id="logTableBody">
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #7f8c8d;">No records generated yet in this active session.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- STEP 3: DYNAMIC BATCH METADATA ENTRIES -->
+    <div class="section-title">📝 Step 3: Global Reference Configuration & Compilation</div>
+    <div class="meta-container">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="metaResNo">Finance Sub-Committee Meeting No.</label>
+                <input type="text" id="metaResNo" value="FIN-SC-2026">
+            </div>
+            <div class="form-group">
+                <label for="metaResDate">Finance Sub-Committee Meeting Date</label>
+                <input type="date" id="metaResDate">
+            </div>
+            <div class="form-group">
+                <label for="metaHoiNo">HOI Report Reference No.</label>
+                <input type="text" id="metaHoiNo" value="TFHS/HOI-REPORT/2026-000">
+            </div>
+            <div class="form-group">
+                <label for="metaHoiDate">HOI Report Issue Date</label>
+                <input type="date" id="metaHoiDate">
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="metaAdminNo">Administrator Order No.</label>
+                <input type="text" id="metaAdminNo" value="TFHS/ADMN ORDER/2026-000">
+            </div>
+            <div class="form-group">
+                <label for="metaAdminDate">Administrator Approval Date</label>
+                <input type="date" id="metaAdminDate">
+            </div>
+        </div>
+        
+        <div class="btn-group" style="margin-top: 15px;">
+            <button type="button" class="btn btn-suite" id="suiteBtn" disabled onclick="compileConsolidatedSuite()">
+                📂 Compile Documents Suite (Notice-Res-HOI-Admn Order)
+            </button>
+            <button type="button" class="btn btn-slips" id="slipsBtn" disabled onclick="compilePayOrderSlips()">
+                🎫 Generate A4 Pay Order Slips
+            </button>
+        </div>
+    </div>
+
+    <!-- MASTER DOCUMENT PRINT SUITE -->
+    <div id="masterDocumentSuite" class="master-doc-output">
+        <button class="btn btn-print-direct" onclick="window.print()">🖨️ Print Document Suite</button>
+        <div id="suiteInnerContainer"></div>
+    </div>
+
+    <!-- PAY ORDER PRINT SUITE -->
+    <div id="payOrderSlipsSuite" class="slips-output">
+        <button class="btn btn-print-direct" onclick="window.print()">🖨️ Print Pay Slips</button>
+        <div id="slipsInnerContainer"></div>
+    </div>
+</div>
+
+<script>
+    const accountRegistry = {
+        "MDM": { account: "110000315825", bank: "BDCC, TALDANGRA" },
+        "VOCATIONAL": { account: "11110260145", bank: "SBI, BANKURA" },
+        "SSM": { account: "32452532658", bank: "SBI, TALDANGRA" },
+        "GENERAL": { account: "5536011000623", bank: "BGVB, TALDANGRA" },
+        "DEVELOPMENT": { account: "5536011000624", bank: "BGVB, TALDANGRA" },
+        "HOSTEL": { account: "606113025908", bank: "BDCC, TALDANGRA" }
+    };
+
+    let sessionEntries = [];
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const todayStr = "2026-07-16"; 
+        document.getElementById("chqDate").value = todayStr;
+        document.getElementById("metaResDate").value = todayStr;
+        document.getElementById("metaHoiDate").value = todayStr;
+        document.getElementById("metaAdminDate").value = todayStr;
+    });
+
+    function updateAccountDetails() {
+        const selectedFund = document.getElementById("fundSelect").value;
+        const manualFundBox = document.getElementById("manualFundBox");
+        const bankAccField = document.getElementById("bankAcc");
+        const bankNameField = document.getElementById("bankName");
+
+        if (selectedFund === "MANUAL") {
+            manualFundBox.style.display = "block";
+            document.getElementById("manualFundInput").required = true;
+            bankAccField.readOnly = false;
+            bankNameField.readOnly = false;
+            bankAccField.value = "";
+            bankNameField.value = "";
+            bankAccField.placeholder = "Enter Bank A/C No.";
+            bankNameField.placeholder = "Enter Bank Branch Name";
+        } else {
+            manualFundBox.style.display = "none";
+            document.getElementById("manualFundInput").required = false;
+            bankAccField.readOnly = true;
+            bankNameField.readOnly = true;
+            bankAccField.placeholder = "Auto-filled";
+            bankNameField.placeholder = "Auto-filled";
+            if (accountRegistry[selectedFund]) {
+                bankAccField.value = accountRegistry[selectedFund].account;
+                bankNameField.value = accountRegistry[selectedFund].bank;
+            }
+        }
+    }
+
+    function togglePayeeInput() {
+        const isManual = document.getElementById("payeeSelect").value === "MANUAL";
+        document.getElementById("manualPayeeBox").style.display = isManual ? "block" : "none";
+        document.getElementById("manualPayeeInput").required = isManual;
+    }
+
+    function togglePurposeInput() {
+        const isManual = document.getElementById("purposeSelect").value === "MANUAL";
+        document.getElementById("manualPurposeBox").style.display = isManual ? "block" : "none";
+        document.getElementById("manualPurposeInput").required = isManual;
+    }
+
+    function toggleChqTypeInput() {
+        const isManual = document.getElementById("chqType").value === "MANUAL";
+        document.getElementById("manualChqTypeBox").style.display = isManual ? "block" : "none";
+        document.getElementById("manualChqTypeInput").required = isManual;
+    }
+
+    function numToWords(num) {
+        const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+        if (!n) return ''; 
+        let str = '';
+        str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
+        str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
+        str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
+        str += (n[4] != 0) ? a[Number(n[4])] + 'Hundred ' : '';
+        str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+        return 'Rupees ' + str.trim() + ' Only';
+    }
+
+    function saveEntry(e) {
+        e.preventDefault();
+
+        const fundVal = document.getElementById("fundSelect").value;
+        const finalFund = fundVal === "MANUAL" ? document.getElementById("manualFundInput").value : fundVal;
+        
+        const payeeVal = document.getElementById("payeeSelect").value;
+        const finalPayee = payeeVal === "MANUAL" ? document.getElementById("manualPayeeInput").value : payeeVal;
+        
+        const purposeVal = document.getElementById("purposeSelect").value;
+        const finalPurpose = purposeVal === "MANUAL" ? document.getElementById("manualPurposeInput").value : purposeVal;
+
+        const chqVal = document.getElementById("chqType").value;
+        const finalChqType = chqVal === "MANUAL" ? document.getElementById("manualChqTypeInput").value : chqVal;
+
+        const entry = {
+            fund: finalFund,
+            account: document.getElementById("bankAcc").value,
+            bank: document.getElementById("bankName").value,
+            payee: finalPayee,
+            chqType: finalChqType,
+            chqNo: document.getElementById("chqNo").value,
+            date: document.getElementById("chqDate").value,
+            amount: parseFloat(document.getElementById("expAmount").value).toFixed(2),
+            purpose: finalPurpose
+        };
+
+        sessionEntries.push(entry);
+        document.getElementById("suiteBtn").disabled = false;
+        document.getElementById("slipsBtn").disabled = false;
+        
+        renderLogTable();
+        clearForm();
+    }
+
+
+    function renderLogTable() {
+        const tbody = document.getElementById("logTableBody");
+        tbody.innerHTML = sessionEntries.map(entry => `
+            <tr>
+                <td><strong>${entry.fund}</strong></td>
+                <td>${entry.account}</td>
+                <td>${entry.payee}</td>
+                <td>${entry.chqType}</td>
+                <td>${entry.chqNo}</td>
+                <td>${formatDate(entry.date)}</td>
+                <td class="text-right">₹${entry.amount}</td>
+            </tr>
+        `).join('');
+    }
+
+    function groupEntriesByFund() {
+        return sessionEntries.reduce((groups, item) => {
+            if (!groups[item.fund]) groups[item.fund] = [];
+            groups[item.fund].push(item);
+            return groups;
+        }, {});
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return "________";
+        const parts = dateString.split("-");
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+
+    // SCALE-TO-FIT ENGINE: forces content to stay strictly within one physical A4 box.
+    // If natural content height exceeds the box, the content is proportionally shrunk
+    // (never allowed to spill onto another page). minScale sets a legibility floor.
+    function shrinkToFit(fitEl, boxEl, minScale, reservePx) {
+        if (!fitEl || !boxEl) return;
+        fitEl.style.transform = "none";
+        fitEl.style.width = "100%";
+        const prevHeight = fitEl.style.height;
+        fitEl.style.height = "auto";
+        const naturalHeight = fitEl.scrollHeight;
+        const cs = getComputedStyle(boxEl);
+        const paddingTop = parseFloat(cs.paddingTop) || 0;
+        const paddingBottom = parseFloat(cs.paddingBottom) || 0;
+        const availableHeight = boxEl.clientHeight - paddingTop - paddingBottom - (reservePx || 0);
+        if (availableHeight > 0 && naturalHeight > availableHeight) {
+            let scale = availableHeight / naturalHeight;
+            if (scale < minScale) scale = minScale;
+            fitEl.style.transformOrigin = "top left";
+            fitEl.style.transform = `scale(${scale})`;
+            fitEl.style.width = (100 / scale) + "%";
+        } else {
+            fitEl.style.height = prevHeight || "";
+        }
+    }
+
+    function fitAllPages() {
+        document.querySelectorAll("#suiteInnerContainer .a4-page").forEach(page => {
+            shrinkToFit(page.querySelector(".a4-fit"), page, 0.45, 55);
+        });
+    }
+
+    function fitAllSlips() {
+        document.querySelectorAll("#slipsInnerContainer .a4-slip-compressed").forEach(slip => {
+            shrinkToFit(slip.querySelector(".slip-fit"), slip, 0.55, 0);
+        });
+    }
+
+    // PATH A: GENERATE RESOLUTION DOC SUITE STAGE (EXACTLY 4 SEPARATE A4 MODULES)
+    function compileConsolidatedSuite() {
+        document.getElementById("payOrderSlipsSuite").style.display = "none";
+        const container = document.getElementById("suiteInnerContainer");
+        container.innerHTML = "";
+        
+        const grouped = groupEntriesByFund();
+        const resNoVal = document.getElementById("metaResNo").value || "________";
+        const resDateVal = formatDate(document.getElementById("metaResDate").value);
+        const hoiNoVal = document.getElementById("metaHoiNo").value || "________";
+        const hoiDateVal = formatDate(document.getElementById("metaHoiDate").value);
+        const adminNoVal = document.getElementById("metaAdminNo").value || "________";
+        const adminDateVal = formatDate(document.getElementById("metaAdminDate").value);
+
+        // --- PAGE 1: MEETING NOTICE ---
+        let page1 = `<div class="a4-page">
+            <div class="binding-gutter"><span></span><span></span><span></span><span></span></div>
+            <div class="record-stamp">Office Copy — For File &amp; Audit</div>
+            <div class="a4-fit">
+            <div class="school-header-title">Taldangra Fulmati High School (H.S.)</div>
+            <div class="school-header-sub" style="border-bottom: none; padding-bottom: 0;">Bankura, West Bengal | Contact: 03243-265114</div>
+            <div class="doc-title" style="margin-top: 10px;">NOTICE FOR FINANCE SUB-COMMITTEE MEETING</div>
+            <div class="doc-meta">
+                <div>Notice Ref No: TFHS/FSC-NOTICE/${resNoVal}</div>
+                <div>Date of Issue: ${resDateVal}</div>
+            </div>
+            <p class="doc-body-text">All members of the Finance Sub-Committee of Taldangra Fulmati High School (H.S.) are hereby notified that a meeting will be held at the Headmaster's Office Room to evaluate voucher structures and authorize institutional head expenditures.</p>
+            <p><strong>Meeting Agenda:</strong></p>
+            <ol>
+                <li>Review and checker allocation of vouchers placed by the HM.</li>
+                <li>Clearance of recurring funds and development heads.</li>
+            </ol>
+            
+            <div style="margin-top: 30px;">
+                <h4 style="margin: 0 0 10px 0; font-size: 13px;">Committee Roll & Signatures Log:</h4>
+                <table style="font-size: 12px; width:100%;">
+                    <thead>
+                        <tr><th>Sl No.</th><th>Member Name</th><th>Role Description</th><th>Signature with Date</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td style="text-align:center;">1</td><td><strong>Sri Prabir Kumar Dangar</strong></td><td>Headmaster (President & Convenor)</td><td><br></td></tr>
+                        <tr><td style="text-align:center;">2</td><td><strong>Sri Mahim Kumar Paine</strong></td><td>AT & Staff Council Secretary (Member)</td><td><br></td></tr>
+                        <tr><td style="text-align:center;">3</td><td><strong>Sri Swapan Kumar Maji</strong></td><td>Assistant Headmaster (Member - Former)</td><td><br></td></tr>
+                        <tr><td style="text-align:center;">4</td><td><strong>Sri Tapas Kundu</strong></td><td>AT & Assistant Staff Council Secretary (Member)</td><td><br></td></tr>
+                        <tr><td style="text-align:center;">5</td><td><strong>Sri Tapan Kumar Diyasi</strong></td><td>Group-D Staff (Non-Teaching Representative)</td><td><br></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="doc-footer" style="margin-top: 40px;">
+                <div></div>
+                <div>Sri Prabir Kumar Dangar<br>Headmaster & Convenor</div>
+            </div>
+            </div>
+            <div class="audit-footer"><span>TFHS Fund Allocation Suite</span><span>Page 1 of 4 — Notice</span></div>
+        </div>`;
+        container.innerHTML += page1;
+
+        // --- PAGE 2: RESOLUTIONS ADOPTED ---
+        let resTablesContent = "";
+        for (const fundName in grouped) {
+            const items = grouped[fundName];
+            resTablesContent += `<div class="fund-group-header">${fundName} Head — A/C: ${items[0].account}</div>`;
+            resTablesContent += `<table><thead><tr><th style="width:40px;">Sl</th><th>Payee Reference</th><th>Purpose Description</th><th class="text-right">Amount (₹)</th></tr></thead><tbody>`;
+            items.forEach((item, index) => {
+                resTablesContent += `<tr><td style="text-align:center;">${index + 1}</td><td>${item.payee}</td><td>${item.purpose}</td><td class="text-right"><strong>${item.amount}</strong></td></tr>`;
+            });
+            resTablesContent += `</tbody></table>`;
+        }
+
+        let page2 = `<div class="a4-page">
+            <div class="binding-gutter"><span></span><span></span><span></span><span></span></div>
+            <div class="record-stamp">Office Copy — For File &amp; Audit</div>
+            <div class="a4-fit">
+            <div class="doc-title">Resolutions Adopted in the Meeting of the Finance Sub-Committee</div>
+            <div class="doc-meta">
+                <div>Meeting Resolution No: ${resNoVal}</div>
+                <div>Meeting Held Date: ${resDateVal}</div>
+            </div>
+
+            <div style="margin-bottom: 18px;">
+                <h4 style="margin: 0 0 8px 0; font-size: 13px; color:#0B2545;">Members Present:</h4>
+                <table style="font-size: 12px; width:100%;">
+                    <thead>
+                        <tr><th style="width:36px;">Sl No.</th><th>Name of Member Present</th><th style="width:130px;">Signature</th><th style="width:110px;">Remarks</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td style="text-align:center;">1</td><td><strong>Sri Prabir Kumar Dangar</strong></td><td><br></td><td><br></td></tr>
+                        <tr><td style="text-align:center;">2</td><td><strong>Sri Mahim Kumar Paine</strong></td><td><br></td><td><br></td></tr>
+                        <tr><td style="text-align:center;">3</td><td><strong>Sri Swapan Kumar Maji</strong></td><td><br></td><td><br></td></tr>
+                        <tr><td style="text-align:center;">4</td><td><strong>Sri Tapas Kundu</strong></td><td><br></td><td><br></td></tr>
+                        <tr><td style="text-align:center;">5</td><td><strong>Sri Tapan Kumar Diyasi</strong></td><td><br></td><td><br></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="doc-body-text">The meeting started under the Chairmanship of Sri Prabir Kumar Dangar, Headmaster. At the onset of the meeting, the chairperson welcomed all present respected persons. All the bills and vouchers placed by the HM regarding payments of various expenditures out of respective institutional funds were checked thoroughly. It is seen that payments towards various expenditures against the under-noted funds are to be made, whose bills are attached herewith so as to meet up the expenditure made as per description:</p>
+            ${resTablesContent}
+            <div class="doc-footer" style="margin-top: 30px;">
+                <div>Prepared By:<br><br>____________________</div>
+                <div>Checked By:<br><br>____________________</div>
+                <div>Sri Prabir Kumar Dangar<br>Headmaster / Chairperson</div>
+            </div>
+            </div>
+            <div class="audit-footer"><span>Res No. ${resNoVal}</span><span>Page 2 of 4 — Resolution</span></div>
+        </div>`;
+        container.innerHTML += page2;
+
+        // --- PAGE 3: HOI REPORT ---
+        let hoiTablesContent = "";
+        for (const fundName in grouped) {
+            const items = grouped[fundName];
+            hoiTablesContent += `<div class="fund-group-header">${fundName} Head — A/C: ${items[0].account}</div>`;
+            hoiTablesContent += `<table><thead><tr><th style="width:40px;">Sl</th><th>Payee Head</th><th>Fund HEAD</th><th>Audited Purpose Block</th><th class="text-right">Total (₹)</th></tr></thead><tbody>`;
+            items.forEach((item, index) => {
+                hoiTablesContent += `<tr><td style="text-align:center;">${index + 1}</td><td>${item.payee}</td><td>${item.fund}</td><td>${item.purpose}</td><td class="text-right"><strong>${item.amount}</strong></td></tr>`;
+            });
+            hoiTablesContent += `</tbody></table>`;
+        }
+
+        let page3 = `<div class="a4-page">
+            <div class="binding-gutter"><span></span><span></span><span></span><span></span></div>
+            <div class="record-stamp">Office Copy — For File &amp; Audit</div>
+            <div class="a4-fit">
+            <div class="doc-title">Head of Institution (HOI) Report</div>
+            <div class="doc-meta">
+                <div>Report Reference No: ${hoiNoVal}</div>
+                <div>Date of Report: ${hoiDateVal}</div>
+                <div style="grid-column: span 2; border-top: 1px solid #ccc; padding-top:4px;">Auto Fetch Authorization: Verified via Resolution No: <strong>${resNoVal}</strong> Dated <strong>${resDateVal}</strong></div>
+            </div>
+            <p class="doc-body-text">As per the recommendations of the Finance Sub-Committee, payments are authorized to be executed to the respective payees whose transactional summaries are compiled below. All corresponding bills, vouchers, chequebooks, and the Cheque Issue Register have been audited and placed to pass for payment accordingly:</p>
+            ${hoiTablesContent}
+            <div class="doc-footer" style="margin-top: 40px;">
+                <div>Verified Account Secretariat:<br><br>____________________</div>
+                <div>Sri Prabir Kumar Dangar<br>Head of Institution (HOI)</div>
+            </div>
+            </div>
+            <div class="audit-footer"><span>HOI Ref. ${hoiNoVal}</span><span>Page 3 of 4 — HOI Report</span></div>
+        </div>`;
+        container.innerHTML += page3;
+
+        // --- PAGE 4: ADMINISTRATOR APPROVAL ORDER (WITH TOTALS & REF LABELS) ---
+        let adminTablesContent = "";
+        for (const fundName in grouped) {
+            const items = grouped[fundName];
+            let fundTotal = 0;
+            adminTablesContent += `<div class="fund-group-header">${fundName} Head — A/C: ${items[0].account}</div>`;
+            adminTablesContent += `<table><thead><tr><th style="width:36px;">Sl</th><th>Beneficiary</th><th>Purpose Reference</th><th>Cheque Type</th><th>Cheque No.</th><th>Issue Date</th><th class="text-right">Passed (₹)</th></tr></thead><tbody>`;
+            items.forEach((item, index) => {
+                fundTotal += parseFloat(item.amount);
+                adminTablesContent += `<tr><td style="text-align:center;">${index + 1}</td><td>${item.payee}</td><td>As noted in HOI report</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>${item.amount}</strong></td></tr>`;
+            });
+            // Append explicit fundwise summary line row
+            adminTablesContent += `<tr style="background:#f9f9f9; font-weight:bold;"><td colspan="6" style="text-align:right;">Fund head Consolidated Total (${fundName}):</td><td class="text-right">₹${fundTotal.toFixed(2)}</td></tr>`;
+            adminTablesContent += `</tbody></table>`;
+        }
+
+        let page4 = `<div class="a4-page">
+            <div class="binding-gutter"><span></span><span></span><span></span><span></span></div>
+            <div class="record-stamp">Office Copy — For File &amp; Audit</div>
+            <div class="a4-fit">
+            <div class="doc-title">Administrator Approval Order</div>
+            <div class="doc-meta">
+                <div>ADMINISTRATOR ORDER NO: ${adminNoVal}</div>
+                <div>Order Date: ${adminDateVal}</div>
+                <div>Sub-Committee Ref: Res No. ${resNoVal} (${resDateVal})</div>
+                <div>HOI Report Baseline Ref: ${hoiNoVal} (${hoiDateVal})</div>
+            </div>
+            <p class="doc-body-text">As per the recommendations of the Finance Sub-Committee and the accompanying validation reports from the Head of the Institution (HOI), the following bank instruments/cheques are passed and approved for processing to the respective beneficiaries as explicitly stated within the fund allocations listed below:</p>
+            ${adminTablesContent}
+            <div class="doc-footer" style="margin-top: 40px;">
+                <div>Prepared By:<br><br>____________________</div>
+                <div style="text-align: right; font-weight: bold;">
+                    ADMINISTRATOR<br>
+                    TALDANGRA FULMATI HIGH SCHOOL (H.S.)
+                </div>
+            </div>
+            </div>
+            <div class="audit-footer"><span>Admn Order No. ${adminNoVal}</span><span>Page 4 of 4 — Administrator Order</span></div>
+        </div>`;
+        container.innerHTML += page4;
+
+        document.getElementById("masterDocumentSuite").style.display = "block";
+        fitAllPages();
+        document.getElementById("masterDocumentSuite").scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // PATH B: PRINTER PAY ORDER SLIPS STAGE (RIGIDLY 2 SLIPS PER A4 PAGE)
+    function compilePayOrderSlips() {
+        document.getElementById("masterDocumentSuite").style.display = "none";
+        const slipsContainer = document.getElementById("slipsInnerContainer");
+        slipsContainer.innerHTML = "";
+
+        const resNoVal = document.getElementById("metaResNo").value || "________";
+        const hoiNoVal = document.getElementById("metaHoiNo").value || "________";
+        const adminOrderNo = document.getElementById("metaAdminNo").value || "________";
+        const adminDateVal = formatDate(document.getElementById("metaAdminDate").value);
+
+        // Step through batch registry in increments of 2
+        for (let i = 0; i < sessionEntries.length; i += 2) {
+            let pageWrapper = document.createElement("div");
+            pageWrapper.className = "a4-page-slip-wrapper";
+            pageWrapper.innerHTML = `<div class="binding-gutter"><span></span><span></span><span></span><span></span><span></span><span></span></div>`;
+            
+            for (let j = 0; j < 2; j++) {
+                const entryIndex = i + j;
+                
+                // Force blank spacer partition padding if entries count ends on odd number (e.g. 3, 5 tokens)
+                if (entryIndex >= sessionEntries.length) {
+                    let blankBlock = document.createElement("div");
+                    blankBlock.className = "a4-slip-blank";
+                    pageWrapper.appendChild(blankBlock);
+                    continue;
+                }
+                
+                const entry = sessionEntries[entryIndex];
+                const wordsAmt = numToWords(Math.floor(entry.amount));
+                const slNoVal = String(entryIndex + 1).padStart(2, '0');
+                const paymentOrderNo = `${resNoVal} / ${hoiNoVal} / ${adminOrderNo} / SL-${slNoVal}`;
+                
+                let slipBlock = document.createElement("div");
+                slipBlock.className = "a4-slip-compressed";
+                slipBlock.innerHTML = `
+                    <div class="slip-fit">
+                    <div>
+                        <div class="slip-banner-wrap"><div class="slip-banner">Payment Order</div></div>
+                        <div class="school-header-title">Taldangra Fulmati High School (H.S.)</div>
+                        <div class="school-header-sub">Bankura, West Bengal | Contact: 03243-265114</div>
+
+                        <div class="slip-ref-block">
+                            <div class="slip-ref-line"><strong>Payment Order No:</strong> ${paymentOrderNo}</div>
+                            <div class="slip-ref-grid">
+                                <div>Res No: <strong>${resNoVal}</strong></div>
+                                <div>HOI Report No: <strong>${hoiNoVal}</strong></div>
+                                <div>Admn Order No: <strong>${adminOrderNo}</strong></div>
+                                <div>Sl No: <strong>${slNoVal}</strong></div>
+                            </div>
+                            <div class="slip-ref-line" style="margin-top:3px;">Dated (as per Administrator Order): <strong>${adminDateVal}</strong></div>
+                        </div>
+                        
+                        <div class="slip-row">
+                            <div class="slip-label">Debit Fund Account:</div>
+                            <div class="slip-value"><strong>${entry.fund} Fund</strong> (A/C No. ${entry.account})</div>
+                        </div>
+
+                        <div class="slip-row">
+                            <div class="slip-label">Authorized Beneficiary:</div>
+                            <div class="slip-value"><strong>${entry.payee}</strong></div>
+                        </div>
+
+                        <table class="slip-table">
+                            <thead>
+                                <tr><th>Particulars</th><th>Instrument Head</th><th>Ch No.</th><th>Amount (₹)</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>${entry.purpose}</td>
+                                    <td><strong>${entry.chqType}</strong></td>
+                                    <td><code>${entry.chqNo}</code></td>
+                                    <td style="text-align:right; font-weight:bold;">₹${entry.amount}</td>
+                                </tr>
+                                <tr><td colspan="4" style="text-align:left; font-size:11px; font-style:italic;"><strong>In Words:</strong> ${wordsAmt}</td></tr>
+                            </tbody>
+                        </table>
+
+                        <div class="doc-footer" style="margin-top:12px; padding-bottom: 5px;">
+                            <div>ADMINISTRATOR SIGN:<br><br>____________________</div>
+                            <div style="text-align:right;">HEADMASTER SIGN:<br><br>____________________</div>
+                        </div>
+                    </div>
+
+                    <div class="receipt-counterpart">
+                        <div class="receipt-title">Recipient Counterpart Acknowledgment Receipt (Attached)</div>
+                        <div class="slip-row" style="font-size: 11px; margin-bottom: 2px;">
+                            <div>Acknowledged receipt of Cheque No: <code>${entry.chqNo}</code> (${entry.chqType})</div>
+                            <div>Dated: ${formatDate(entry.date)}</div>
+                            <div>Amount: ₹${entry.amount}</div>
+                        </div>
+                        <div class="doc-footer" style="margin-top: 10px;">
+                            <div>Disbursed Head Point: HM / Administration</div>
+                            <div style="text-align:right;">Recipient Signature Area: ____________________</div>
+                        </div>
+                    </div>
+                    </div>
+                `;
+                pageWrapper.appendChild(slipBlock);
+            }
+            slipsContainer.appendChild(pageWrapper);
+        }
+
+        document.getElementById("payOrderSlipsSuite").style.display = "block";
+        fitAllSlips();
+        document.getElementById("payOrderSlipsSuite").scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function clearForm() {
+        document.getElementById("ledgerForm").reset();
+        document.getElementById("bankAcc").value = "";
+        document.getElementById("bankName").value = "";
+        document.getElementById("chqDate").value = "2026-07-16";
+        document.getElementById("manualPayeeBox").style.display = "none";
+        document.getElementById("manualPurposeBox").style.display = "none";
+        document.getElementById("manualChqTypeBox").style.display = "none";
+        document.getElementById("manualFundBox").style.display = "none";
+        document.getElementById("bankAcc").readOnly = true;
+        document.getElementById("bankName").readOnly = true;
+        document.getElementById("bankAcc").placeholder = "Auto-filled";
+        document.getElementById("bankName").placeholder = "Auto-filled";
+    }
+</script>
+</body>
+</html>

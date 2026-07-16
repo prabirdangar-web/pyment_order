@@ -224,35 +224,38 @@
         .receipt-counterpart { margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
         .receipt-title { text-align: center; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; color: #000; }
 
-        @media print {
+       @media print {
             html, body {
-                background: white;
+                background: #FFFFFF !important;
+                background-color: #FFFFFF !important;
                 padding: 0;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
                 color-adjust: exact;
             }
             .form-container, .meta-container, .table-container, header, .section-title, .btn-group, .btn-print-direct { display: none !important; }
-            .master-doc-output, .slips-output { border: none; box-shadow: none; padding: 0; display: block !important; }
-            .a4-page { border: none; margin: 0; width: 100%; }
-            .a4-page-slip-wrapper { border: none; margin: 0; padding-left: 14mm; width: 100%; height: 100%; }
+            .master-doc-output, .slips-output { border: none !important; box-shadow: none !important; padding: 0 !important; display: block !important; }
+            .a4-page { border: none !important; margin: 0 !important; width: 100% !important; background: #FFFFFF !important; }
+            .a4-page-slip-wrapper { border: none !important; margin: 0 !important; padding-left: 14mm !important; width: 100% !important; height: 100% !important; background: #FFFFFF !important; }
 
-            /* PRINTER-FRIENDLY OVERRIDE — safe for B/W and colour printers alike:
-               all ink is forced to solid black text on white/light-grey fills so
-               nothing depends on colour rendering or background-graphics being on. */
+            /* STRICT BLACK TEXT AND WHITE BACKGROUND OVERRIDE */
             .a4-page, .a4-page *, .a4-slip-compressed, .a4-slip-compressed *,
             .a4-page-slip-wrapper, .a4-page-slip-wrapper * {
-                color: #000 !important;
+                color: #000000 !important;
+                background: #FFFFFF !important;
+                background-color: #FFFFFF !important;
+                border-color: #000000 !important;
                 text-shadow: none !important;
                 box-shadow: none !important;
             }
-            th { background-color: #E6E6E6 !important; }
-            table tbody tr:nth-child(even) { background-color: #F4F4F4 !important; }
-            .doc-meta, .slip-ref-block { background: #FFFFFF !important; border-color: #000 !important; }
-            .fund-group-header { background: #F2F2F2 !important; border-color: #000 !important; }
-            .slip-banner { background: #FFFFFF !important; border-color: #000 !important; }
-            .record-stamp, .audit-footer, .school-header-sub { border-color: #000 !important; }
-            .binding-gutter span { background: #FFFFFF !important; border-color: #000 !important; }
+            
+            /* Clear out any subtle shades or header accents completely */
+            th, .slip-table th { background: #FFFFFF !important; background-color: #FFFFFF !important; border: 1px solid #000000 !important; }
+            table tbody tr:nth-child(even) { background: #FFFFFF !important; background-color: #FFFFFF !important; }
+            .doc-meta, .slip-ref-block, .fund-group-header, .slip-banner { background: #FFFFFF !important; background-color: #FFFFFF !important; border: 2px solid #000000 !important; }
+            .record-stamp, .audit-footer, .school-header-sub { border-color: #000000 !important; }
+            .binding-gutter span { background: #FFFFFF !important; border: 1px solid #000000 !important; }
+            .slip-value { border-bottom: 1px dotted #000000 !important; }
         }
     </style>
 </head>

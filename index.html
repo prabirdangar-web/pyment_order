@@ -224,23 +224,49 @@
         .receipt-counterpart { margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
         .receipt-title { text-align: center; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; color: #000; }
 
-       @media print {
-            html, body {
+@media print {
+            /* 1. Reset base canvas to strict white */
+            html, body, .container {
                 background: #FFFFFF !important;
                 background-color: #FFFFFF !important;
-                padding: 0;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-                color-adjust: exact;
+                color: #000000 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
             }
-            .form-container, .meta-container, .table-container, header, .section-title, .btn-group, .btn-print-direct { display: none !important; }
-            .master-doc-output, .slips-output { border: none !important; box-shadow: none !important; padding: 0 !important; display: block !important; }
-            .a4-page { border: none !important; margin: 0 !important; width: 100% !important; background: #FFFFFF !important; }
-            .a4-page-slip-wrapper { border: none !important; margin: 0 !important; padding-left: 14mm !important; width: 100% !important; height: 100% !important; background: #FFFFFF !important; }
 
-            /* STRICT BLACK TEXT AND WHITE BACKGROUND OVERRIDE */
-            .a4-page, .a4-page *, .a4-slip-compressed, .a4-slip-compressed *,
-            .a4-page-slip-wrapper, .a4-page-slip-wrapper * {
+            /* 2. Hide all non-printable UI controls */
+            .form-container, .meta-container, .table-container, header, .section-title, .btn-group, .btn-print-direct { 
+                display: none !important; 
+            }
+
+            /* 3. Setup core print wrappers */
+            .master-doc-output, .slips-output { 
+                border: none !important; 
+                box-shadow: none !important; 
+                padding: 0 !important; 
+                display: block !important; 
+                background: #FFFFFF !important;
+            }
+            .a4-page { 
+                border: none !important; 
+                margin: 0 !important; 
+                width: 100% !important; 
+                background: #FFFFFF !important; 
+            }
+            .a4-page-slip-wrapper { 
+                border: none !important; 
+                margin: 0 !important; 
+                padding-left: 14mm !important; 
+                width: 100% !important; 
+                height: 100% !important; 
+                background: #FFFFFF !important; 
+            }
+
+            /* 4. FORCE EVERY SINGLE SUB-ELEMENT TO BLACK TEXT & WHITE BACKGROUND */
+            .a4-page *, .a4-slip-compressed *, .a4-page-slip-wrapper * {
                 color: #000000 !important;
                 background: #FFFFFF !important;
                 background-color: #FFFFFF !important;
@@ -248,6 +274,34 @@
                 text-shadow: none !important;
                 box-shadow: none !important;
             }
+
+            /* 5. Force borders and structural lines to solid black */
+            table, th, td, .slip-table, .slip-table th, .slip-table td {
+                border: 1px solid #000000 !important;
+                background: #FFFFFF !important;
+                background-color: #FFFFFF !important;
+            }
+            
+            /* Remove background tints from specific components */
+            .doc-meta, .slip-ref-block, .fund-group-header, .slip-banner { 
+                background: #FFFFFF !important; 
+                background-color: #FFFFFF !important; 
+                border: 2px solid #000000 !important; 
+            }
+            
+            /* Fix dotted lines and small markers */
+            .slip-value { 
+                border-bottom: 1px dotted #000000 !important; 
+            }
+            .binding-gutter span { 
+                background: #FFFFFF !important; 
+                background-color: #FFFFFF !important; 
+                border: 1px solid #000000 !important; 
+            }
+            .record-stamp, .audit-footer, .school-header-sub { 
+                border-color: #000000 !important; 
+            }
+        
             
             /* Clear out any subtle shades or header accents completely */
             th, .slip-table th { background: #FFFFFF !important; background-color: #FFFFFF !important; border: 1px solid #000000 !important; }

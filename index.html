@@ -14,6 +14,10 @@
             --border-color: #E2E8F0;
         }
 
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-color);
@@ -75,27 +79,23 @@
         .section-title { font-size: 18px; color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-top: 40px; margin-bottom: 15px; font-weight: 600; }
         .table-container { background: var(--card-bg); border-radius: 8px; overflow-x: auto; margin-bottom: 25px; }
         
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; margin-bottom: 15px; page-break-inside: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; margin-bottom: 15px; page-break-inside: auto; table-layout: fixed; }
         tr { page-break-inside: avoid; page-break-after: auto; }
         
-        /* MONOCHROME HIGH-CONTRAST SCREEN DEFAULT FOR THEAD OVERRIDES */
-        th { background-color: #FFFFFF; color: #000000; padding: 9px 10px; font-weight: 600; border: 1px solid #000000; text-align: center; letter-spacing: 0.3px; }
-        
-        td { padding: 9px 10px; border: 1px solid #DDD; vertical-align: top; }
-        td.text-right, th.text-right { text-align: right; }
+        th { background-color: #FFFFFF; color: #000000; padding: 9px 10px; font-weight: 600; border: 1px solid #000000; text-align: center; letter-spacing: 0.3px; word-wrap: break-word; }
+        td { padding: 9px 10px; border: 1px solid #DDD; vertical-align: top; word-wrap: break-word; }
+        td.text-right, th.text-right { text-align: right; white-space: nowrap; }
         table tbody tr:nth-child(even) { background-color: #FAFBFC; }
 
-        /* Master Outputs styling */
         .master-doc-output, .slips-output { background: white; border: 2px solid #333; border-radius: 8px; padding: 40px; margin-top: 35px; display: none; }
         
-        /* Rigid A4 Page Framework rules — with binding gutter for physical file record */
+        /* Rigid A4 Framework with precise 0.75in margins on Left and Right */
         .a4-page {
             width: 210mm;
             height: 297mm;
-            padding: 18mm 20mm 16mm 32mm;
+            padding: 18mm 19.05mm 16mm 19.05mm; /* 19.05mm equals exactly 0.75 inches */
             margin: 0 auto 30px auto;
             border: 1px dashed #7f8c8d;
-            box-sizing: border-box;
             background: #fff;
             page-break-after: always;
             page-break-inside: avoid;
@@ -104,21 +104,22 @@
             color: #111;
         }
         .a4-page:last-child { page-break-after: avoid; }
-        .a4-fit { transform-origin: top left; }
+        .a4-fit { transform-origin: top left; width: 100%; }
 
-        /* Binding gutter: punch-hole markers along the left edge for physical file binding */
+        /* Punch-hole markers shifted smoothly into the 0.75 margin block zone */
         .binding-gutter {
             position: absolute;
             top: 0; left: 0; bottom: 0;
-            width: 20mm;
-            border-right: 1px dashed #B9C2CC;
+            width: 12mm;
+            border-right: 1px dashed #E2E8F0;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: space-evenly;
+            opacity: 0.4;
         }
         .binding-gutter span {
-            width: 9px; height: 9px;
+            width: 7px; height: 7px;
             border-radius: 50%;
             border: 1px solid #9AA5B1;
             background: #FBFCFD;
@@ -126,7 +127,7 @@
 
         .record-stamp {
             position: absolute;
-            top: 8mm; right: 20mm;
+            top: 8mm; right: 19.05mm;
             font-size: 9px;
             letter-spacing: 1.5px;
             text-transform: uppercase;
@@ -136,7 +137,7 @@
 
         .audit-footer {
             position: absolute;
-            bottom: 8mm; left: 32mm; right: 20mm;
+            bottom: 8mm; left: 19.05mm; right: 19.05mm;
             display: flex;
             justify-content: space-between;
             font-size: 9px;
@@ -149,28 +150,26 @@
 
         .doc-body-text { text-align: justify; line-height: 1.55; }
 
-        /* Pay slip container splits page in exactly two balanced blocks */
         .a4-page-slip-wrapper {
             width: 210mm;
             height: 297mm;
             margin: 0 auto;
-            box-sizing: border-box;
             page-break-after: always;
             page-break-inside: avoid;
             display: flex;
             flex-direction: column;
             position: relative;
-            padding-left: 14mm;
+            padding-left: 19.05mm;
+            padding-right: 19.05mm;
             overflow: hidden;
         }
         .a4-page-slip-wrapper:last-child { page-break-after: avoid; }
-        .a4-page-slip-wrapper .binding-gutter { width: 14mm; border-right: 1px dashed #B9C2CC; }
+        .a4-page-slip-wrapper .binding-gutter { width: 12mm; border-right: 1px dashed #E2E8F0; }
 
         .a4-slip-compressed {
             height: 148mm;
             border: 2px solid #000;
             padding: 15px 25px;
-            box-sizing: border-box;
             background: #fff;
             color: #000;
             overflow: hidden;
@@ -182,11 +181,11 @@
             justify-content: space-between;
             transform-origin: top left;
             height: 100%;
+            width: 100%;
         }
         .a4-slip-blank {
             height: 148mm;
             border: 1px dashed #ccc;
-            box-sizing: border-box;
             background: #fafafa;
         }
 
@@ -220,9 +219,10 @@
         .slip-label { font-weight: bold; width: 160px; }
         .slip-value { flex-grow: 1; border-bottom: 1px dotted #000; padding-left: 5px; }
         
-        .slip-table { width: 100%; margin-top: 8px; border: 1px solid #000; border-collapse: collapse; }
-        .slip-table th, .slip-table td { border: 1px solid #000; padding: 5px 8px; font-size: 11px; color: #000; }
+        .slip-table { width: 100%; margin-top: 8px; border: 1px solid #000; border-collapse: collapse; table-layout: fixed; }
+        .slip-table th, .slip-table td { border: 1px solid #000; padding: 5px 8px; font-size: 11px; color: #000; word-wrap: break-word; }
         .slip-table th { background-color: #E6E6E6; }
+        .slip-table td.text-right, .slip-table th.text-right { text-align: right; white-space: nowrap; }
 
         .receipt-counterpart { margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
         .receipt-title { text-align: center; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; color: #000; }
@@ -231,64 +231,87 @@
            UNIVERSAL MONOCHROME HIGH-CONTRAST PRINT OVERRIDE
            ========================================================================== */
         @media print {
-            /* Force base layout canvas to absolute white */
-            html, body, .container, .master-doc-output, .slips-output, .a4-page, .a4-page-slip-wrapper {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+
+            html, body {
                 background: #FFFFFF !important;
-                background-color: #FFFFFF !important;
                 color: #000000 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .container, .master-doc-output, .slips-output {
+                background: #FFFFFF !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 border: none !important;
                 box-shadow: none !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
+                width: 100% !important;
             }
 
-            /* Hide interactive UI elements completely */
+            .a4-page {
+                width: 210mm !important;
+                height: 297mm !important;
+                padding: 18mm 19.05mm 16mm 19.05mm !important; /* Preserves 0.75 margin in output */
+                margin: 0 auto !important;
+                border: none !important;
+                box-shadow: none !important;
+                page-break-after: always !important;
+                background: #FFFFFF !important;
+            }
+
+            .a4-page-slip-wrapper {
+                width: 210mm !important;
+                height: 297mm !important;
+                padding-left: 19.05mm !important;
+                padding-right: 19.05mm !important;
+                margin: 0 auto !important;
+                border: none !important;
+                box-shadow: none !important;
+                page-break-after: always !important;
+                background: #FFFFFF !important;
+            }
+
             .form-container, .meta-container, .table-container, header, .section-title, .btn-group, .btn-print-direct { 
                 display: none !important; 
             }
 
-            /* FORCE EVERYTHING INSIDE GENERATED OUTPUT TO BLACK TEXT, SOLID LINES & WHITE FILL */
             * {
                 color: #000000 !important;
-                background: #FFFFFF !important;
-                background-color: #FFFFFF !important;
-                border-color: #000000 !important;
                 text-shadow: none !important;
                 box-shadow: none !important;
             }
 
-            /* Explicit structural framework rules */
             table, th, td, tr, .slip-table, .slip-table th, .slip-table td {
                 border: 1px solid #000000 !important;
                 background: #FFFFFF !important;
-                background-color: #FFFFFF !important;
                 color: #000000 !important;
+            }
+
+            td.text-right, th.text-right, .slip-table td.text-right, .slip-table th.text-right {
+                white-space: nowrap !important;
             }
             
             table tbody tr:nth-child(even) { 
                 background: #FFFFFF !important; 
-                background-color: #FFFFFF !important; 
             }
             
-            /* Remove block color panels from metadata blocks and badges */
             .doc-meta, .slip-ref-block, .fund-group-header, .slip-banner { 
                 background: #FFFFFF !important; 
-                background-color: #FFFFFF !important; 
                 border: 1px solid #000000 !important; 
-                border-left: 1px solid #000000 !important;
                 color: #000000 !important;
             }
             
-            /* Dotted alignment borders and punch indicators */
             .slip-value { 
                 border-bottom: 1px dotted #000000 !important; 
             }
             .binding-gutter span { 
                 background: #FFFFFF !important; 
-                background-color: #FFFFFF !important; 
                 border: 1px solid #000000 !important; 
             }
             .record-stamp, .audit-footer, .school-header-sub { 
@@ -327,7 +350,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label voor="bankAcc">Bank Account No.</label>
+                    <label for="bankAcc">Bank Account No.</label>
                     <input type="text" id="bankAcc" readonly placeholder="Auto-filled">
                 </div>
                 <div class="form-group">
@@ -401,6 +424,15 @@
     <div class="section-title">📋 Step 2: Session Entry Log Verification</div>
     <div class="table-container">
         <table>
+            <colgroup>
+                <col style="width: 14%;">
+                <col style="width: 14%;">
+                <col style="width: 18%;">
+                <col style="width: 14%;">
+                <col style="width: 12%;">
+                <col style="width: 11%;">
+                <col style="width: 17%;">
+            </colgroup>
             <thead>
                 <tr>
                     <th>Fund Category</th>
@@ -484,8 +516,6 @@
 
     let sessionEntries = [];
 
-    // Returns today's date as YYYY-MM-DD using the LOCAL date (not UTC), so it is always
-    // correct for whatever day the file is actually opened on.
     function todayISO() {
         const d = new Date();
         const y = d.getFullYear();
@@ -494,9 +524,6 @@
         return `${y}-${m}-${day}`;
     }
 
-    // Historical "Purpose Description Head" entries, gathered from past pay-order records.
-    // Used only to power the searchable suggestion list on the Purpose field below —
-    // pick one to reuse it, or just type a fresh description.
     const purposeHistory = [
         "ADMINISTRATIVE HONORIUM: Prabir Kumar Dangar, Project Co-ordinator-650 | Subhendu Karmakar, Off Staff (Internal)-325 | Prakash Sardar, Off Staff (Internal)-Lab Attendant-325 | Tapan Kumar Diyasi, Gr.D Staff (Internal)-260 | Niranjan Murmu, Gr.D Staff (Internal)-260 | Ram Prasad Layek, Part Time Night Watchman-3000",
         "Aqua Guard Servicing & Repair",
@@ -647,7 +674,6 @@
         clearForm();
     }
 
-
     function renderLogTable() {
         const tbody = document.getElementById("logTableBody");
         tbody.innerHTML = sessionEntries.map(entry => `
@@ -746,6 +772,12 @@
             <div style="margin-top: 30px;">
                 <h4 style="margin: 0 0 10px 0; font-size: 13px;">Committee Roll & Signatures Log:</h4>
                 <table style="font-size: 12px; width:100%;">
+                    <colgroup>
+                        <col style="width: 10%;">
+                        <col style="width: 30%;">
+                        <col style="width: 30%;">
+                        <col style="width: 30%;">
+                    </colgroup>
                     <thead>
                         <tr><th>Sl No.</th><th>Member Name</th><th>Role Description</th><th>Signature with Date</th></tr>
                     </thead>
@@ -769,14 +801,25 @@
 
         // --- PAGE 2: RESOLUTIONS ADOPTED ---
         let resTablesContent = "";
-        for (const fundName in grouped) {
-            const items = grouped[fundName];
-            resTablesContent += `<div class="fund-group-header">${fundName} Head — A/C: ${items[0].account}</div>`;
-            resTablesContent += `<table><thead><tr><th style="width:40px;">Sl</th><th>Payee Reference</th><th>Purpose Description</th><th class="text-right">Amount (₹)</th></tr></thead><tbody>`;
-            items.forEach((item, index) => {
-                resTablesContent += `<tr><td style="text-align:center;">${index + 1}</td><td>${item.payee}</td><td>${item.purpose}</td><td class="text-right"><strong>${item.amount}</strong></td></tr>`;
-            });
-            resTablesContent += `</tbody></table>`;
+        {
+            let rows = "";
+            let sl = 0;
+            let grandTotal = 0;
+            for (const fundName in grouped) {
+                grouped[fundName].forEach(item => {
+                    sl++;
+                    grandTotal += parseFloat(item.amount) || 0;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td>${item.purpose}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                });
+            }
+            let summary = "";
+            for (const fundName in grouped) {
+                const items = grouped[fundName];
+                const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+                summary += `<tr style="background:#F7F9FC;"><td colspan="4" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
+            }
+            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="4" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
+            resTablesContent = `<table><colgroup><col style="width: 6%;"><col style="width: 22%;"><col style="width: 24%;"><col style="width: 32%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Fund Head / A/C No.</th><th>Payee Reference</th><th>Purpose Description</th><th class="text-right">Amount (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;
         }
 
         let page2 = `<div class="a4-page">
@@ -792,8 +835,14 @@
             <div style="margin-bottom: 18px;">
                 <h4 style="margin: 0 0 8px 0; font-size: 13px; color:#0B2545;">Members Present:</h4>
                 <table style="font-size: 12px; width:100%;">
+                    <colgroup>
+                        <col style="width: 10%;">
+                        <col style="width: 45%;">
+                        <col style="width: 25%;">
+                        <col style="width: 20%;">
+                    </colgroup>
                     <thead>
-                        <tr><th style="width:36px;">Sl No.</th><th>Name of Member Present</th><th style="width:130px;">Signature</th><th style="width:110px;">Remarks</th></tr>
+                        <tr><th>Sl No.</th><th>Name of Member Present</th><th>Signature</th><th>Remarks</th></tr>
                     </thead>
                     <tbody>
                         <tr><td style="text-align:center;">1</td><td><strong>Sri Prabir Kumar Dangar</strong></td><td><br></td><td><br></td></tr>
@@ -819,14 +868,25 @@
 
         // --- PAGE 3: HOI REPORT ---
         let hoiTablesContent = "";
-        for (const fundName in grouped) {
-            const items = grouped[fundName];
-            hoiTablesContent += `<div class="fund-group-header">${fundName} Head — A/C: ${items[0].account}</div>`;
-            hoiTablesContent += `<table><thead><tr><th style="width:40px;">Sl</th><th>Payee Head</th><th>Fund HEAD</th><th>Audited Purpose Block</th><th class="text-right">Total (₹)</th></tr></thead><tbody>`;
-            items.forEach((item, index) => {
-                hoiTablesContent += `<tr><td style="text-align:center;">${index + 1}</td><td>${item.payee}</td><td>${item.fund}</td><td>${item.purpose}</td><td class="text-right"><strong>${item.amount}</strong></td></tr>`;
-            });
-            hoiTablesContent += `</tbody></table>`;
+        {
+            let rows = "";
+            let sl = 0;
+            let grandTotal = 0;
+            for (const fundName in grouped) {
+                grouped[fundName].forEach(item => {
+                    sl++;
+                    grandTotal += parseFloat(item.amount) || 0;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td>${item.payee}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.purpose}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                });
+            }
+            let summary = "";
+            for (const fundName in grouped) {
+                const items = grouped[fundName];
+                const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+                summary += `<tr style="background:#F7F9FC;"><td colspan="4" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
+            }
+            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="4" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
+            hoiTablesContent = `<table><colgroup><col style="width: 6%;"><col style="width: 24%;"><col style="width: 22%;"><col style="width: 32%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Payee Head</th><th>Fund HEAD / A/C No.</th><th>Audited Purpose Block</th><th class="text-right">Total (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;
         }
 
         let page3 = `<div class="a4-page">
@@ -852,17 +912,25 @@
 
         // --- PAGE 4: ADMINISTRATOR APPROVAL ORDER ---
         let adminTablesContent = "";
-        for (const fundName in grouped) {
-            const items = grouped[fundName];
-            let fundTotal = 0;
-            adminTablesContent += `<div class="fund-group-header">${fundName} Head — A/C: ${items[0].account}</div>`;
-            adminTablesContent += `<table><thead><tr><th style="width:36px;">Sl</th><th>Beneficiary</th><th>Purpose Reference</th><th>Cheque Type</th><th>Cheque No.</th><th>Issue Date</th><th class="text-right">Passed (₹)</th></tr></thead><tbody>`;
-            items.forEach((item, index) => {
-                fundTotal += parseFloat(item.amount);
-                adminTablesContent += `<tr><td style="text-align:center;">${index + 1}</td><td>${item.payee}</td><td>As noted in HOI report</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>${item.amount}</strong></td></tr>`;
-            });
-            adminTablesContent += `<tr style="background:#f9f9f9; font-weight:bold;"><td colspan="6" style="text-align:right;">Fund head Consolidated Total (${fundName}):</td><td class="text-right">₹${fundTotal.toFixed(2)}</td></tr>`;
-            adminTablesContent += `</tbody></table>`;
+        {
+            let rows = "";
+            let sl = 0;
+            let grandTotal = 0;
+            for (const fundName in grouped) {
+                grouped[fundName].forEach(item => {
+                    sl++;
+                    grandTotal += parseFloat(item.amount) || 0;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td>As noted in HOI report</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                });
+            }
+            let summary = "";
+            for (const fundName in grouped) {
+                const items = grouped[fundName];
+                const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+                summary += `<tr style="background:#F7F9FC;"><td colspan="7" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
+            }
+            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="7" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
+            adminTablesContent = `<table><colgroup><col style="width: 4%;"><col style="width: 16%;"><col style="width: 17%;"><col style="width: 13%;"><col style="width: 14%;"><col style="width: 10%;"><col style="width: 10%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Fund Head / A/C No.</th><th>Beneficiary</th><th>Purpose Reference</th><th>Cheque Type</th><th>Cheque No.</th><th>Issue Date</th><th class="text-right">Passed (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;
         }
 
         let page4 = `<div class="a4-page">
@@ -956,15 +1024,21 @@
                         </div>
 
                         <table class="slip-table">
+                            <colgroup>
+                                <col style="width: 38%;">
+                                <col style="width: 24%;">
+                                <col style="width: 16%;">
+                                <col style="width: 22%;">
+                            </colgroup>
                             <thead>
-                                <tr><th>Particulars</th><th>Instrument Head</th><th>Ch No.</th><th>Amount (₹)</th></tr>
+                                <tr><th>Particulars</th><th>Instrument Head</th><th>Ch No.</th><th class="text-right">Amount (₹)</th></tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td>${entry.purpose}</td>
                                     <td><strong>${entry.chqType}</strong></td>
                                     <td><code>${entry.chqNo}</code></td>
-                                    <td style="text-align:right; font-weight:bold;">₹${entry.amount}</td>
+                                    <td class="text-right" style="font-weight:bold;">₹${entry.amount}</td>
                                 </tr>
                                 <tr><td colspan="4" style="text-align:left; font-size:11px; font-style:italic;"><strong>In Words:</strong> ${wordsAmt}</td></tr>
                             </tbody>
@@ -981,7 +1055,7 @@
                         <div class="slip-row" style="font-size: 11px; margin-bottom: 2px;">
                             <div>Acknowledged receipt of Cheque No: <code>${entry.chqNo}</code> (${entry.chqType})</div>
                             <div>Dated: ${formatDate(entry.date)}</div>
-                            <div>Amount: ₹${entry.amount}</div>
+                            <div style="white-space: nowrap;">Amount: <strong>₹${entry.amount}</strong></div>
                         </div>
                         <div class="doc-footer" style="margin-top: 10px;">
                             <div>Disbursed Head Point: HM / Administration</div>

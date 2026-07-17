@@ -384,21 +384,10 @@
                     <input type="number" id="expAmount" step="0.01" placeholder="0.00" required>
                 </div>
                 <div class="form-group full-width">
-                    <label for="purposeSelect">Purpose Description Head</label>
-                    <select id="purposeSelect" onchange="togglePurposeInput()" required>
-                        <option value="" disabled selected>-- Select Purpose --</option>
-                        <option value="Administrative Staff Honorarium">Administrative Staff Honorarium</option>
-                        <option value="Other Recurring Expenses">Other Recurring Expenses (Training materials, Electricity, Office expenses)</option>
-                        <option value="MDM Cooking Materials">MDM Cooking Materials (Vegetable, Egg)</option>
-                        <option value="MDM Cooking Fuel">MDM Cooking Materials (Firewood)</option>
-                        <option value="SHG Honorarium">Honorarium SHG Cooking Staff</option>
-                        <option value="Printing Question Papers">Question Paper Printing & Xerox Paper Bill</option>
-                        <option value="Office Stationery Dues">Office Stationery Annual Due Settlement</option>
-                        <option value="MANUAL">-- Manual / Other Purpose --</option>
-                    </select>
-                    <div id="manualPurposeBox" class="conditional-box">
-                        <textarea id="manualPurposeInput" rows="2" placeholder="Enter custom description..."></textarea>
-                    </div>
+                    <label for="purposeInput">Purpose Description Head</label>
+                    <input type="text" id="purposeInput" list="purposeDatalist" placeholder="Type to search past purposes, or enter a new description..." required>
+                    <datalist id="purposeDatalist"></datalist>
+                    <div style="font-size:11px; color:#64748B; margin-top:4px;">Start typing to see matching purposes used before — pick a suggestion or just type a fresh description manually.</div>
                 </div>
             </div>
 
@@ -495,12 +484,78 @@
 
     let sessionEntries = [];
 
+    // Returns today's date as YYYY-MM-DD using the LOCAL date (not UTC), so it is always
+    // correct for whatever day the file is actually opened on.
+    function todayISO() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    // Historical "Purpose Description Head" entries, gathered from past pay-order records.
+    // Used only to power the searchable suggestion list on the Purpose field below —
+    // pick one to reuse it, or just type a fresh description.
+    const purposeHistory = [
+        "ADMINISTRATIVE HONORIUM: Prabir Kumar Dangar, Project Co-ordinator-650 | Subhendu Karmakar, Off Staff (Internal)-325 | Prakash Sardar, Off Staff (Internal)-Lab Attendant-325 | Tapan Kumar Diyasi, Gr.D Staff (Internal)-260 | Niranjan Murmu, Gr.D Staff (Internal)-260 | Ram Prasad Layek, Part Time Night Watchman-3000",
+        "Aqua Guard Servicing & Repair",
+        "Audit Fee / Audit Related Expenditure",
+        "CCTV Purchase / Repair including Mechanical Charge",
+        "Due Payments - Electrical Repairing Work (incl. Material & Mechanical Charge)",
+        "Due Payments - Xerox Bill",
+        "Due Payments for Purchasing Materials as per Bills/Vouchers Attached",
+        "Due Payments to Soumen Nandi (Sikshasathi) - Office Stationery",
+        "Erection/Repair of Gate, Class Rooms, BaLA Painting & Signage",
+        "Expenditure for 5th September / Teachers' Day Observation",
+        "Expenditure for Annual Sports (Prizes, Function, Tiffin etc.)",
+        "Expenditure for Independence Day / Republic Day Observation",
+        "Expenditure for Saraswati Puja / Other Cultural Observation",
+        "Flower Garden / Gardening Materials & Labour Charge",
+        "Honorarium of Administrative Staff",
+        "Honorarium of SHG Cooking Staff",
+        "Internet / Broadband Bill",
+        "Kanyashree Uploading Fee",
+        "Labour Charge for School Premises / Solar Plate Cleaning",
+        "MDM Additional Nutrition Materials (Fruits, Egg, Sweet, Ice-cream)",
+        "MDM Cooking Materials - Chicken / Special Menu",
+        "MDM Cooking Materials - Firewood / Gas",
+        "MDM Cooking Materials - Grocery",
+        "MDM Cooking Materials - Vegetable & Egg",
+        "Office Stationery Purchase / Due Settlement",
+        "OTHER RECURRING EXPENSES: Training Materials Cost VIII+ -750 | Training Materials Cost X+ -1450 | Electricity Charge-400 | Office Expenses-332",
+        "Purchasing Computer / Printer Accessories (Toner, UPS, Keyboard etc.)",
+        "Purchasing Cooking Utensils / Repairing MDM Shed",
+        "Purchasing Laboratory Materials (Physics/Chemistry/Biology/Geography)",
+        "Purchasing Materials for RAA / Composite Grant Activities",
+        "Purchasing New Benches / Furniture",
+        "Purchasing Potato for Mid-Day Meal Distribution (Phase-wise)",
+        "Purchasing Prizes for Ceremony / Observation Day",
+        "Purchasing Sugar/Chhola/Soap for Mid-Day Meal Distribution (Phase-wise)",
+        "Purchasing Uniform for Students",
+        "Question Paper Printing & Xerox Paper Bill",
+        "Refund of Earnest / Security Money",
+        "Refund of Unutilized Grant",
+        "Remuneration (Monthly, Contractual Staff)",
+        "Repair Work of Bench, Chair, Table (Carpenter Charge & Materials)",
+        "TA (Travel Allowance) Bill - DI/AI Office & Meetings",
+        "Tiffin & Sweet Expenses for Meetings/Programmes",
+        "To Meet up Various Expenditure as per Bills/Vouchers Attached",
+        "Water Pipe Line Work / Repair including Materials & Labour Charge"
+    ];
+
+    function populatePurposeDatalist() {
+        const dl = document.getElementById("purposeDatalist");
+        dl.innerHTML = purposeHistory.map(p => `<option value="${p.replace(/"/g, '&quot;')}"></option>`).join('');
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
-        const todayStr = "2026-07-16"; 
+        const todayStr = todayISO();
         document.getElementById("chqDate").value = todayStr;
         document.getElementById("metaResDate").value = todayStr;
         document.getElementById("metaHoiDate").value = todayStr;
         document.getElementById("metaAdminDate").value = todayStr;
+        populatePurposeDatalist();
     });
 
     function updateAccountDetails() {
@@ -538,12 +593,6 @@
         document.getElementById("manualPayeeInput").required = isManual;
     }
 
-    function togglePurposeInput() {
-        const isManual = document.getElementById("purposeSelect").value === "MANUAL";
-        document.getElementById("manualPurposeBox").style.display = isManual ? "block" : "none";
-        document.getElementById("manualPurposeInput").required = isManual;
-    }
-
     function toggleChqTypeInput() {
         const isManual = document.getElementById("chqType").value === "MANUAL";
         document.getElementById("manualChqTypeBox").style.display = isManual ? "block" : "none";
@@ -573,8 +622,7 @@
         const payeeVal = document.getElementById("payeeSelect").value;
         const finalPayee = payeeVal === "MANUAL" ? document.getElementById("manualPayeeInput").value : payeeVal;
         
-        const purposeVal = document.getElementById("purposeSelect").value;
-        const finalPurpose = purposeVal === "MANUAL" ? document.getElementById("manualPurposeInput").value : purposeVal;
+        const finalPurpose = document.getElementById("purposeInput").value.trim();
 
         const chqVal = document.getElementById("chqType").value;
         const finalChqType = chqVal === "MANUAL" ? document.getElementById("manualChqTypeInput").value : chqVal;
@@ -956,9 +1004,8 @@
         document.getElementById("ledgerForm").reset();
         document.getElementById("bankAcc").value = "";
         document.getElementById("bankName").value = "";
-        document.getElementById("chqDate").value = "2026-07-16";
+        document.getElementById("chqDate").value = todayISO();
         document.getElementById("manualPayeeBox").style.display = "none";
-        document.getElementById("manualPurposeBox").style.display = "none";
         document.getElementById("manualChqTypeBox").style.display = "none";
         document.getElementById("manualFundBox").style.display = "none";
         document.getElementById("bankAcc").readOnly = true;

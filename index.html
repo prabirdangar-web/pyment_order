@@ -464,6 +464,10 @@
                 <input type="date" id="metaResDate">
             </div>
             <div class="form-group">
+                <label for="metaResTime">Finance Sub-Committee Meeting Time</label>
+                <input type="time" id="metaResTime" value="11:00">
+            </div>
+            <div class="form-group">
                 <label for="metaHoiNo">HOI Report Reference No.</label>
                 <input type="text" id="metaHoiNo" value="TFHS/HOI-REPORT/2026-000">
             </div>
@@ -703,6 +707,16 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
+    function formatTime(timeString) {
+        if (!timeString) return "________";
+        const [hStr, mStr] = timeString.split(":");
+        let h = parseInt(hStr, 10);
+        const ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12;
+        if (h === 0) h = 12;
+        return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+    }
+
     function shrinkToFit(fitEl, boxEl, minScale, reservePx) {
         if (!fitEl || !boxEl) return;
         fitEl.style.transform = "none";
@@ -745,6 +759,7 @@
         const grouped = groupEntriesByFund();
         const resNoVal = document.getElementById("metaResNo").value || "________";
         const resDateVal = formatDate(document.getElementById("metaResDate").value);
+        const resTimeVal = formatTime(document.getElementById("metaResTime").value);
         const hoiNoVal = document.getElementById("metaHoiNo").value || "________";
         const hoiDateVal = formatDate(document.getElementById("metaHoiDate").value);
         const adminNoVal = document.getElementById("metaAdminNo").value || "________";
@@ -761,8 +776,10 @@
             <div class="doc-meta">
                 <div>Notice Ref No: TFHS/FSC-NOTICE/${resNoVal}</div>
                 <div>Date of Issue: ${resDateVal}</div>
+                <div>Meeting Date: ${resDateVal}</div>
+                <div>Meeting Time: ${resTimeVal}</div>
             </div>
-            <p class="doc-body-text">All members of the Finance Sub-Committee of Taldangra Fulmati High School (H.S.) are hereby notified that a meeting will be held at the Headmaster's Office Room to evaluate voucher structures and authorize institutional head expenditures.</p>
+            <p class="doc-body-text">All members of the Finance Sub-Committee of Taldangra Fulmati High School (H.S.) are hereby notified that a meeting will be held on <strong>${resDateVal}</strong> at <strong>${resTimeVal}</strong> at the Headmaster's Office Room to evaluate voucher structures and authorize institutional head expenditures.</p>
             <p><strong>Meeting Agenda:</strong></p>
             <ol>
                 <li>Review and checker allocation of vouchers placed by the HM.</li>
@@ -830,6 +847,7 @@
             <div class="doc-meta">
                 <div>Meeting Resolution No: ${resNoVal}</div>
                 <div>Meeting Held Date: ${resDateVal}</div>
+                <div>Meeting Held Time: ${resTimeVal}</div>
             </div>
 
             <div style="margin-bottom: 18px;">

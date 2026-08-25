@@ -757,6 +757,8 @@
         container.innerHTML = "";
         
         const grouped = groupEntriesByFund();
+        const fundHeadsList = Object.keys(grouped);
+        const fundHeadsStr = fundHeadsList.length ? fundHeadsList.join(", ") : "________";
         const resNoVal = document.getElementById("metaResNo").value || "________";
         const resDateVal = formatDate(document.getElementById("metaResDate").value);
         const resTimeVal = formatTime(document.getElementById("metaResTime").value);
@@ -783,7 +785,7 @@
             <p><strong>Meeting Agenda:</strong></p>
             <ol>
                 <li>Review and checker allocation of vouchers placed by the HM.</li>
-                <li>Clearance of recurring funds and development heads.</li>
+                <li>Clearance of vouchers under the following fund head(s): <strong>${fundHeadsStr}</strong>.</li>
             </ol>
             
             <div style="margin-top: 30px;">

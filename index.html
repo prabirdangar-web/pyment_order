@@ -578,10 +578,10 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    // Collection: one document per ledger entry, shared across all devices/sessions.
-    const ledgerCollection = db.collection("ledgerEntries");
+    // Single shared document, matching the rest of the TFHS suite's storage pattern:
+    // one document per tool at /tfhs/{toolName}, holding the whole dataset as a field.
+    const ledgerDocRef = db.doc("tfhs/ledgerEntries");
     let currentUser = null;
-    let unsubscribeLedger = null;
 </script>
 
 <script>
@@ -674,10 +674,12 @@
             updateAuthUI();
         });
 
-        // Live, real-time listener — entries persist and sync across every device/session.
-        ledgerCollection.orderBy("createdAt", "asc").onSnapshot(
+        // Live, real-time listener on the shared document — entries persist and
+        // sync across every device/session, matching the rest of the TFHS suite.
+        ledgerDocRef.onSnapshot(
             snapshot => {
-                sessionEntries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const data = snapshot.data();
+                sessionEntries = (data && Array.isArray(data.entries)) ? data.entries : [];
                 renderLogTable();
                 const hasEntries = sessionEntries.length > 0;
                 document.getElementById("suiteBtn").disabled = !hasEntries;
@@ -812,6 +814,7 @@
         const finalChqType = chqVal === "MANUAL" ? document.getElementById("manualChqTypeInput").value : chqVal;
 
         const entry = {
+            id: 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
             fund: finalFund,
             account: document.getElementById("bankAcc").value,
             bank: document.getElementById("bankName").value,
@@ -821,11 +824,16 @@
             date: document.getElementById("chqDate").value,
             amount: parseFloat(document.getElementById("expAmount").value).toFixed(2),
             purpose: finalPurpose,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt: new Date().toISOString(),
             createdBy: currentUser.email
         };
 
-        ledgerCollection.add(entry)
+        const updatedEntries = [...sessionEntries, entry];
+
+        ledgerDocRef.set({
+            entries: updatedEntries,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true })
             .then(() => {
                 clearForm();
             })
@@ -840,7 +848,13 @@
             return;
         }
         if (!confirm("Remove this entry from the cloud ledger? This cannot be undone.")) return;
-        ledgerCollection.doc(entryId).delete()
+
+        const updatedEntries = sessionEntries.filter(entry => entry.id !== entryId);
+
+        ledgerDocRef.set({
+            entries: updatedEntries,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true })
             .catch(err => alert("Could not delete entry: " + err.message));
     }
 

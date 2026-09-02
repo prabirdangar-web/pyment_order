@@ -60,6 +60,49 @@
         .form-group { display: flex; flex-direction: column; }
         .form-group.full-width { grid-column: span 2; }
 
+        .auth-bar {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+        .auth-bar input {
+            padding: 8px 10px;
+            font-size: 13px;
+            border: 1px solid #CBD5E1;
+            border-radius: 4px;
+        }
+        .auth-status { font-weight: 600; }
+        .auth-status.signed-in { color: #15803D; }
+        .auth-status.signed-out { color: #B91C1C; }
+        .sync-status { font-size: 12px; color: #64748B; margin-left: auto; }
+        .btn-small {
+            padding: 7px 12px;
+            font-size: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: var(--secondary-color);
+            color: #fff;
+        }
+        .btn-small.logout { background: #B91C1C; }
+        .btn-danger-row {
+            padding: 4px 8px;
+            font-size: 11px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #B91C1C;
+            color: #fff;
+        }
+        .btn-danger-row:disabled { background: #CBD5E1; cursor: not-allowed; }
+
         label { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--secondary-color); }
         input, select, textarea { padding: 10px; font-size: 14px; border: 1px solid #CBD5E1; border-radius: 4px; background-color: #FFF; }
         input[readonly] { background-color: #F1F5F9; color: #64748B; cursor: not-allowed; }
@@ -329,6 +372,15 @@
         <p>Institutional Administration Module — Comprehensive A4 Formatting Suite</p>
     </header>
 
+    <div class="auth-bar" id="authBar">
+        <span id="authStatus" class="auth-status signed-out">Checking sign-in status…</span>
+        <input type="email" id="authEmail" placeholder="Admin email" style="display:none;">
+        <input type="password" id="authPassword" placeholder="Password" style="display:none;">
+        <button type="button" class="btn-small" id="authActionBtn" onclick="handleAuthAction()" style="display:none;">Sign In</button>
+        <button type="button" class="btn-small logout" id="authLogoutBtn" onclick="handleSignOut()" style="display:none;">Sign Out</button>
+        <span class="sync-status" id="syncStatus">Connecting to cloud database…</span>
+    </div>
+
     <div class="section-title">✍️ Step 1: Add Fund Entries (Incrementally)</div>
     <div class="form-container">
         <form id="ledgerForm" onsubmit="saveEntry(event)">
@@ -431,7 +483,8 @@
                 <col style="width: 14%;">
                 <col style="width: 12%;">
                 <col style="width: 11%;">
-                <col style="width: 17%;">
+                <col style="width: 13%;">
+                <col style="width: 8%;">
             </colgroup>
             <thead>
                 <tr>
@@ -442,11 +495,12 @@
                     <th>Cheque No</th>
                     <th>Date</th>
                     <th class="text-right">Amount (₹)</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="logTableBody">
                 <tr>
-                    <td colspan="7" style="text-align: center; color: #7f8c8d;">No records generated yet in this active session.</td>
+                    <td colspan="8" style="text-align: center; color: #7f8c8d;">No records generated yet in this active session.</td>
                 </tr>
             </tbody>
         </table>
@@ -507,6 +561,28 @@
         <div id="slipsInnerContainer"></div>
     </div>
 </div>
+
+<!-- Firebase SDKs (compat build, single-file friendly) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCiqQFsnbSi6eCgUI_W3NTybzIkRmCI_54",
+        authDomain: "tfhs-portal.firebaseapp.com",
+        projectId: "tfhs-portal",
+        storageBucket: "tfhs-portal.firebasestorage.app",
+        messagingSenderId: "316041012204",
+        appId: "1:316041012204:web:04ee8b19374c60f63716c9"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    // Collection: one document per ledger entry, shared across all devices/sessions.
+    const ledgerCollection = db.collection("ledgerEntries");
+    let currentUser = null;
+    let unsubscribeLedger = null;
+</script>
 
 <script>
     const accountRegistry = {
@@ -587,7 +663,79 @@
         document.getElementById("metaHoiDate").value = todayStr;
         document.getElementById("metaAdminDate").value = todayStr;
         populatePurposeDatalist();
+        initFirebaseSync();
     });
+
+    // ---------- Firebase Auth & Firestore Sync ----------
+
+    function initFirebaseSync() {
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            updateAuthUI();
+        });
+
+        // Live, real-time listener — entries persist and sync across every device/session.
+        ledgerCollection.orderBy("createdAt", "asc").onSnapshot(
+            snapshot => {
+                sessionEntries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderLogTable();
+                const hasEntries = sessionEntries.length > 0;
+                document.getElementById("suiteBtn").disabled = !hasEntries;
+                document.getElementById("slipsBtn").disabled = !hasEntries;
+                document.getElementById("syncStatus").textContent =
+                    `Synced — ${sessionEntries.length} entr${sessionEntries.length === 1 ? 'y' : 'ies'} in cloud ledger`;
+            },
+            err => {
+                console.error("Firestore sync error:", err);
+                document.getElementById("syncStatus").textContent = "⚠ Cloud sync error — check connection";
+            }
+        );
+    }
+
+    function updateAuthUI() {
+        const statusEl = document.getElementById("authStatus");
+        const emailInput = document.getElementById("authEmail");
+        const passInput = document.getElementById("authPassword");
+        const actionBtn = document.getElementById("authActionBtn");
+        const logoutBtn = document.getElementById("authLogoutBtn");
+
+        if (currentUser) {
+            statusEl.textContent = `Signed in as ${currentUser.email} (writes enabled)`;
+            statusEl.className = "auth-status signed-in";
+            emailInput.style.display = "none";
+            passInput.style.display = "none";
+            actionBtn.style.display = "none";
+            logoutBtn.style.display = "inline-block";
+        } else {
+            statusEl.textContent = "Not signed in — viewing only, sign in to add or delete entries";
+            statusEl.className = "auth-status signed-out";
+            emailInput.style.display = "inline-block";
+            passInput.style.display = "inline-block";
+            actionBtn.style.display = "inline-block";
+            actionBtn.textContent = "Sign In";
+            logoutBtn.style.display = "none";
+        }
+    }
+
+    function handleAuthAction() {
+        const email = document.getElementById("authEmail").value.trim();
+        const password = document.getElementById("authPassword").value;
+        if (!email || !password) {
+            alert("Enter both the admin email and password to sign in.");
+            return;
+        }
+        auth.signInWithEmailAndPassword(email, password)
+            .then(() => {
+                document.getElementById("authPassword").value = "";
+            })
+            .catch(err => {
+                alert("Sign-in failed: " + err.message);
+            });
+    }
+
+    function handleSignOut() {
+        auth.signOut();
+    }
 
     function updateAccountDetails() {
         const selectedFund = document.getElementById("fundSelect").value;
@@ -647,6 +795,11 @@
     function saveEntry(e) {
         e.preventDefault();
 
+        if (!currentUser) {
+            alert("Please sign in with the admin account before adding entries.");
+            return;
+        }
+
         const fundVal = document.getElementById("fundSelect").value;
         const finalFund = fundVal === "MANUAL" ? document.getElementById("manualFundInput").value : fundVal;
         
@@ -667,19 +820,36 @@
             chqNo: document.getElementById("chqNo").value,
             date: document.getElementById("chqDate").value,
             amount: parseFloat(document.getElementById("expAmount").value).toFixed(2),
-            purpose: finalPurpose
+            purpose: finalPurpose,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser.email
         };
 
-        sessionEntries.push(entry);
-        document.getElementById("suiteBtn").disabled = false;
-        document.getElementById("slipsBtn").disabled = false;
-        
-        renderLogTable();
-        clearForm();
+        ledgerCollection.add(entry)
+            .then(() => {
+                clearForm();
+            })
+            .catch(err => {
+                alert("Could not save entry to cloud database: " + err.message);
+            });
+    }
+
+    function deleteEntry(entryId) {
+        if (!currentUser) {
+            alert("Please sign in with the admin account before deleting entries.");
+            return;
+        }
+        if (!confirm("Remove this entry from the cloud ledger? This cannot be undone.")) return;
+        ledgerCollection.doc(entryId).delete()
+            .catch(err => alert("Could not delete entry: " + err.message));
     }
 
     function renderLogTable() {
         const tbody = document.getElementById("logTableBody");
+        if (!sessionEntries.length) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #7f8c8d;">No records generated yet in this active session.</td></tr>`;
+            return;
+        }
         tbody.innerHTML = sessionEntries.map(entry => `
             <tr>
                 <td><strong>${entry.fund}</strong></td>
@@ -689,6 +859,9 @@
                 <td>${entry.chqNo}</td>
                 <td>${formatDate(entry.date)}</td>
                 <td class="text-right">₹${entry.amount}</td>
+                <td style="text-align:center;">
+                    <button type="button" class="btn-danger-row" ${currentUser ? '' : 'disabled'} onclick="deleteEntry('${entry.id}')">Delete</button>
+                </td>
             </tr>
         `).join('');
     }

@@ -631,7 +631,13 @@
             <div class="btn-group" style="justify-content:space-between;flex-wrap:wrap;">
                 <div style="display:flex;gap:10px;flex-wrap:wrap;">
                     <button type="button" class="btn btn-secondary" onclick="clearChequeRegForm()">Reset</button>
-                    <button type="button" class="btn btn-suite" style="flex:none;" onclick="autoFetchPaymentsToChequeRegister()">🔄 Auto Fetch Cheques from Payment Register</button>
+                    <button type="button" onclick="autoFetchPaymentsToChequeRegister()">🔄 Auto Fetch Cheques from Payment Register</button>
+          <label style="margin-left:12px;font-weight:600;">View:
+            <select id="chequeRegSortOrder" onchange="renderChequeRegisterTable()">
+              <option value="new">New to Old</option>
+              <option value="old">Old to New</option>
+            </select>
+          </label>
                 </div>
                 <button type="submit" class="btn btn-primary" id="chequeRegSaveBtn">Add to Cheque Register</button>
             </div>

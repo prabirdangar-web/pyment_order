@@ -768,6 +768,8 @@
         document.getElementById("metaHoiDate").value = todayStr;
         document.getElementById("metaAdminDate").value = todayStr;
         populatePurposeDatalist();
+         const sortSelect = document.getElementById("chequeRegSortOrder");
+         if (sortSelect) sortSelect.value = "new";
         initFirebaseSync();
     });
 
@@ -1676,7 +1678,15 @@
         const q = (searchEl ? searchEl.value : "").toLowerCase().trim();
         const fundFilter = fundEl ? fundEl.value : "";
 
-        let rows = chequeRegisterEntries.slice().sort((a, b) => (Number(a.sl) || 0) - (Number(b.sl) || 0));
+        const sortOrder = document.getElementById("chequeRegSortOrder")?.value || "new";
+        let rows = chequeRegisterEntries.slice().sort((a, b) => {
+            // Sort by Date of Issue first; serial number breaks ties.
+            const da = String(a.doi || "");
+            const db = String(b.doi || "");
+            const dateCmp = db.localeCompare(da); // newest first
+            const slCmp = (Number(b.sl) || 0) - (Number(a.sl) || 0);
+            return sortOrder === "old" ? -dateCmp || -slCmp : dateCmp || slCmp;
+        });
         if (fundFilter) rows = rows.filter(entry => entry.acc === fundFilter);
         if (q) rows = rows.filter(entry => [entry.to, entry.purpose, entry.chNo, entry.remarks].some(v => String(v || '').toLowerCase().includes(q)));
 

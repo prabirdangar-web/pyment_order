@@ -607,7 +607,7 @@
                 </div>
                 <div class="form-group">
                     <label for="cregAmount">Amount (₹)</label>
-                    <input type="number" id="cregAmount" step="0.01" placeholder="0.00" required>
+                    <input type="number" id="cregAmount" step="0.01" placeholder="0.00" required oninput="updateChequeRegisterWords()">
                 </div>
             </div>
             <div class="form-grid">
@@ -623,10 +623,17 @@
                     <label for="cregRemarks">Remarks</label>
                     <input type="text" id="cregRemarks" placeholder="Optional remarks">
                 </div>
+                <div class="form-group full-width">
+                    <label for="cregInWords">Amount in Words</label>
+                    <input type="text" id="cregInWords" readonly placeholder="Auto-generated from Amount">
+                </div>
             </div>
-            <div class="btn-group">
-                <button type="button" class="btn btn-secondary" onclick="clearChequeRegForm()">Reset</button>
-                <button type="submit" class="btn btn-primary">Add to Cheque Register</button>
+            <div class="btn-group" style="justify-content:space-between;flex-wrap:wrap;">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button type="button" class="btn btn-secondary" onclick="clearChequeRegForm()">Reset</button>
+                    <button type="button" class="btn btn-suite" style="flex:none;" onclick="autoFetchPaymentsToChequeRegister()">🔄 Auto Fetch Cheques from Payment Register</button>
+                </div>
+                <button type="submit" class="btn btn-primary" id="chequeRegSaveBtn">Add to Cheque Register</button>
             </div>
         </form>
     </div>
@@ -642,13 +649,13 @@
         </div>
         <table style="margin-top:14px;">
             <colgroup>
-                <col style="width:4%;"><col style="width:8%;"><col style="width:13%;"><col style="width:8%;"><col style="width:8%;"><col style="width:9%;"><col style="width:14%;"><col style="width:24%;"><col style="width:8%;"><col style="width:4%;">
+                <col style="width:4%;"><col style="width:8%;"><col style="width:12%;"><col style="width:8%;"><col style="width:8%;"><col style="width:8%;"><col style="width:13%;"><col style="width:20%;"><col style="width:10%;"><col style="width:6%;"><col style="width:7%;">
             </colgroup>
             <thead>
-                <tr><th>Sl</th><th>DOI</th><th>A/C No.</th><th>Ch No.</th><th>Dated</th><th class="text-right">Amount (₹)</th><th>To</th><th>Purpose</th><th>Remarks</th><th>Action</th></tr>
+                <tr><th>Sl</th><th>DOI</th><th>A/C No.</th><th>Ch No.</th><th>Dated</th><th class="text-right">Amount (₹)</th><th>To</th><th>Purpose</th><th>Amount in Words</th><th>Remarks</th><th>Action</th></tr>
             </thead>
             <tbody id="chequeRegBody">
-                <tr><td colspan="10" style="text-align:center;color:#7f8c8d;">Loading cheque register…</td></tr>
+                <tr><td colspan="11" style="text-align:center;color:#7f8c8d;">Loading cheque register…</td></tr>
             </tbody>
         </table>
     </div>
@@ -873,17 +880,35 @@
     }
 
     function numToWords(num) {
-        const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
-        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-        let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
-        if (!n) return ''; 
-        let str = '';
-        str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
-        str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
-        str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
-        str += (n[4] != 0) ? a[Number(n[4])] + 'Hundred ' : '';
-        str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
-        return 'Rupees ' + str.trim() + ' Only';
+        num = Number(num);
+        if (!Number.isFinite(num) || num < 0) return '';
+        num = Math.floor(num);
+
+        const ones = ['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+        const tens = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+
+        function twoDigit(n) {
+            if (n < 20) return ones[n];
+            return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+        }
+        function underThousand(n) {
+            if (n < 100) return twoDigit(n);
+            return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + twoDigit(n % 100) : '');
+        }
+
+        if (num === 0) return 'Rupees Zero Only';
+
+        const parts = [];
+        const crore = Math.floor(num / 10000000); num %= 10000000;
+        const lakh = Math.floor(num / 100000); num %= 100000;
+        const thousand = Math.floor(num / 1000); num %= 1000;
+
+        if (crore) parts.push(underThousand(crore) + ' Crore');
+        if (lakh) parts.push(underThousand(lakh) + ' Lakh');
+        if (thousand) parts.push(underThousand(thousand) + ' Thousand');
+        if (num) parts.push(underThousand(num));
+
+        return 'Rupees ' + parts.join(' ') + ' Only';
     }
 
     function saveEntry(e) {
@@ -928,6 +953,7 @@
         }, { merge: true })
             .then(() => {
                 clearForm();
+                autoFetchPaymentsToChequeRegister(true);
             })
             .catch(err => {
                 alert("Could not save entry to cloud database: " + err.message);
@@ -1403,7 +1429,9 @@
     function initChequeRegisterSync() {
         chequeRegDocRef.onSnapshot(snapshot => {
             const data = snapshot.data();
-            chequeRegisterEntries = (data && Array.isArray(data.entries)) ? data.entries : [];
+            chequeRegisterEntries = (data && Array.isArray(data.entries))
+                ? data.entries.map(e => ({ ...e, inWords: e.inWords || numToWords(e.amount) }))
+                : [];
             chequeRegSeeded = !!(data && data.seeded);
             populateChequeRegFundFilter();
             renderChequeRegisterTable();
@@ -1436,10 +1464,52 @@
         sel.value = current;
     }
 
+    let editingChequeRegId = null;
+
     function toggleCregManualAcc() {
         const isManual = document.getElementById("cregAcc").value === "MANUAL";
         document.getElementById("cregManualAccBox").style.display = isManual ? "block" : "none";
         document.getElementById("cregManualAccInput").required = isManual;
+    }
+
+    function updateChequeRegisterWords() {
+        const amount = parseFloat(document.getElementById("cregAmount").value || "0");
+        const words = document.getElementById("cregInWords");
+        if (words) words.value = amount >= 0 && document.getElementById("cregAmount").value !== "" ? numToWords(amount) : "";
+    }
+
+    function editChequeRegisterEntry(id) {
+        if (!currentUser) {
+            alert("Please sign in with the admin account before editing register entries.");
+            return;
+        }
+        const entry = chequeRegisterEntries.find(e => e.id === id);
+        if (!entry) return;
+
+        editingChequeRegId = id;
+        document.getElementById("cregSl").value = entry.sl ?? "";
+        document.getElementById("cregDoi").value = entry.doi || "";
+        document.getElementById("cregChNo").value = entry.chNo || "";
+        document.getElementById("cregDated").value = entry.dated || "";
+        document.getElementById("cregAmount").value = Number(entry.amount || 0);
+        document.getElementById("cregTo").value = entry.to || "";
+        document.getElementById("cregPurpose").value = entry.purpose || "";
+        document.getElementById("cregRemarks").value = entry.remarks || "";
+        document.getElementById("cregInWords").value = entry.inWords || numToWords(entry.amount);
+
+        const accSelect = document.getElementById("cregAcc");
+        const accOption = Array.from(accSelect.options).find(o => o.value === entry.acc);
+        if (accOption) {
+            accSelect.value = entry.acc;
+            document.getElementById("cregManualAccInput").value = "";
+        } else {
+            accSelect.value = "MANUAL";
+            document.getElementById("cregManualAccInput").value = entry.acc || "";
+        }
+        toggleCregManualAcc();
+
+        document.getElementById("chequeRegSaveBtn").textContent = "Update Cheque Register";
+        document.getElementById("chequeRegForm").scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     function saveChequeRegisterEntry(e) {
@@ -1448,9 +1518,43 @@
             alert("Please sign in with the admin account before adding register entries.");
             return;
         }
+
         const accVal = document.getElementById("cregAcc").value;
-        const finalAcc = accVal === "MANUAL" ? document.getElementById("cregManualAccInput").value.trim() : accVal;
-        const amt = parseFloat(document.getElementById("cregAmount").value || "0");
+        const finalAcc = accVal === "MANUAL"
+            ? document.getElementById("cregManualAccInput").value.trim()
+            : accVal;
+        const amtInput = document.getElementById("cregAmount").value;
+        const amt = parseFloat(amtInput || "0");
+
+        if (!finalAcc || !document.getElementById("cregChNo").value.trim() || amtInput === "" || !Number.isFinite(amt)) {
+            alert("Please complete the account, cheque number and amount.");
+            return;
+        }
+
+        if (editingChequeRegId) {
+            const updated = chequeRegisterEntries.map(x => x.id === editingChequeRegId ? {
+                ...x,
+                doi: document.getElementById("cregDoi").value,
+                acc: finalAcc,
+                chNo: document.getElementById("cregChNo").value.trim(),
+                dated: document.getElementById("cregDated").value,
+                amount: amt.toFixed(2),
+                to: document.getElementById("cregTo").value.trim(),
+                purpose: document.getElementById("cregPurpose").value.trim(),
+                remarks: document.getElementById("cregRemarks").value.trim(),
+                inWords: numToWords(amt),
+                updatedAt: new Date().toISOString(),
+                updatedBy: currentUser.email
+            } : x);
+
+            chequeRegDocRef.set({
+                entries: updated,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true })
+            .then(() => clearChequeRegForm())
+            .catch(err => alert("Could not update register entry: " + err.message));
+            return;
+        }
 
         const entry = {
             id: 'cr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
@@ -1463,7 +1567,7 @@
             to: document.getElementById("cregTo").value.trim(),
             purpose: document.getElementById("cregPurpose").value.trim(),
             remarks: document.getElementById("cregRemarks").value.trim(),
-            inWords: numToWords(Math.floor(amt)),
+            inWords: numToWords(amt),
             createdAt: new Date().toISOString(),
             createdBy: currentUser.email
         };
@@ -1473,8 +1577,74 @@
             entries: updated,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true })
-            .then(() => clearChequeRegForm())
-            .catch(err => alert("Could not save register entry: " + err.message));
+        .then(() => clearChequeRegForm())
+        .catch(err => alert("Could not save register entry: " + err.message));
+    }
+
+    function autoFetchPaymentsToChequeRegister(silent = false) {
+        if (!currentUser) {
+            if (!silent) alert("Please sign in with the admin account before fetching payment records.");
+            return;
+        }
+
+        const paymentRows = Array.isArray(sessionEntries) ? sessionEntries : [];
+        if (!paymentRows.length) {
+            if (!silent) alert("No payment entries are available in the Payment Register yet.");
+            return;
+        }
+
+        const existingKeys = new Set(
+            chequeRegisterEntries.map(e => `${String(e.chNo || '').trim()}|${String(e.acc || '').trim()}`)
+        );
+
+        const newRows = [];
+        paymentRows.forEach(payment => {
+            const chNo = String(payment.chqNo || "").trim();
+            const account = String(payment.account || "").trim();
+            if (!chNo || !account) return;
+
+            const key = `${chNo}|${account}`;
+            if (existingKeys.has(key)) return;
+
+            newRows.push({
+                id: 'payment_creg_' + String(payment.id || (Date.now() + '_' + Math.random().toString(36).slice(2, 8))),
+                sl: 0,
+                doi: payment.date || todayISO(),
+                acc: account + (payment.fund ? ` (${payment.fund})` : ""),
+                chNo: chNo,
+                dated: payment.date || todayISO(),
+                amount: Number(payment.amount || 0).toFixed(2),
+                to: payment.payee || "",
+                purpose: payment.purpose || "",
+                remarks: "Auto fetched from Payment Register",
+                inWords: numToWords(payment.amount || 0),
+                sourcePaymentId: payment.id || "",
+                createdAt: new Date().toISOString(),
+                createdBy: "payment register auto-fetch"
+            });
+            existingKeys.add(key);
+        });
+
+        if (!newRows.length) {
+            if (!silent) alert("All Payment Register cheque entries are already present in the Cheque Issue Register.");
+            return;
+        }
+
+        const merged = [...chequeRegisterEntries, ...newRows];
+        merged.sort((a, b) => String(a.doi || "").localeCompare(String(b.doi || "")) || (Number(a.sl) || 0) - (Number(b.sl) || 0));
+        merged.forEach((row, index) => row.sl = index + 1);
+
+        chequeRegDocRef.set({
+            entries: merged,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true })
+        .then(() => {
+            if (!silent) alert(`Fetched ${newRows.length} new payment/cheque entr${newRows.length === 1 ? "y" : "ies"} into the Cheque Issue Register.`);
+        })
+        .catch(err => {
+            console.error("Auto-fetch error:", err);
+            if (!silent) alert("Could not auto-fetch payment records: " + err.message);
+        });
     }
 
     function deleteChequeRegisterEntry(id) {
@@ -1508,7 +1678,7 @@
         if (slField) slField.value = nextChequeRegSl();
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: #7f8c8d;">No cheque register entries found. Use "Import Legacy Cheque Register" above or add a new entry.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: #7f8c8d;">No cheque register entries found. Use "Import Legacy Cheque Register" above or add a new entry.</td></tr>`;
             const totalEl = document.getElementById("chequeRegTotal");
             if (totalEl) totalEl.textContent = "";
             return;
@@ -1526,8 +1696,10 @@
                 <td class="text-right">₹${(Number(entry.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td>${entry.to}</td>
                 <td>${entry.purpose}</td>
+                <td>${entry.inWords || numToWords(entry.amount)}</td>
                 <td>${entry.remarks || ''}</td>
-                <td style="text-align:center;">
+                <td style="text-align:center;white-space:nowrap;">
+                    <button type="button" class="btn-small" ${currentUser ? '' : 'disabled'} onclick="editChequeRegisterEntry('${entry.id}')">Edit</button>
                     <button type="button" class="btn-danger-row" ${currentUser ? '' : 'disabled'} onclick="deleteChequeRegisterEntry('${entry.id}')">Del</button>
                 </td>
             </tr>`;
@@ -1538,11 +1710,14 @@
     }
 
     function clearChequeRegForm() {
+        editingChequeRegId = null;
         document.getElementById("chequeRegForm").reset();
         document.getElementById("cregSl").value = nextChequeRegSl();
         document.getElementById("cregDoi").value = todayISO();
         document.getElementById("cregDated").value = todayISO();
+        document.getElementById("cregInWords").value = "";
         document.getElementById("cregManualAccBox").style.display = "none";
+        document.getElementById("chequeRegSaveBtn").textContent = "Add to Cheque Register";
     }
 
     function importLegacyChequeRegister() {
@@ -1598,7 +1773,7 @@
             <td>${e.sl}</td><td>${formatDate(e.doi)}</td><td>${e.acc}</td><td>${e.chNo}</td>
             <td>${formatDate(e.dated)}</td>
             <td style="text-align:right;">${(Number(e.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-            <td>${e.to}</td><td>${e.purpose}</td><td>${e.remarks || ''}</td>
+            <td>${e.to}</td><td>${e.purpose}</td><td>${e.inWords || numToWords(e.amount)}</td><td>${e.remarks || ''}</td>
         </tr>`).join('');
 
         const win = window.open('', '_blank');
@@ -1614,7 +1789,7 @@
         </style></head><body>
         <h2>CHEQUE ISSUE REGISTER</h2>
         <p class="sub">Taldangra Fulmati High School (H.S.) — All Fund Accounts — Total Entries: ${rows.length} — Total Amount: ₹${total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-        <table><thead><tr><th>Sl</th><th>DOI</th><th>A/C No.</th><th>Ch No.</th><th>Dated</th><th>Amount (₹)</th><th>To</th><th>Purpose</th><th>Remarks</th></tr></thead>
+        <table><thead><tr><th>Sl</th><th>DOI</th><th>A/C No.</th><th>Ch No.</th><th>Dated</th><th>Amount (₹)</th><th>To</th><th>Purpose</th><th>Amount in Words</th><th>Remarks</th></tr></thead>
         <tbody>${body}</tbody></table>
         </body></html>`);
         win.document.close();

@@ -467,6 +467,7 @@
             </div>
 
             <div class="btn-group">
+                <button type="button" class="btn" style="background-color:#8E44AD;color:#fff;" onclick="generateSSMDebitVoucher()">🧾 Generate SSM Debit Voucher</button>
                 <button type="button" class="btn btn-secondary" onclick="clearForm()">Reset Entry Fields</button>
                 <button type="submit" class="btn btn-primary">Save Entry to Batch Head</button>
             </div>
@@ -917,6 +918,327 @@
         if (num) parts.push(underThousand(num));
 
         return 'Rupees ' + parts.join(' ') + ' Only';
+    }
+
+    // Builds and opens a "Payment (Debit Voucher)" document — matching the standalone
+    // ssm_debit.html layout — pre-filled from the current Step 1 form values.
+    // Only triggers when the selected Fund Head is SSM.
+    function generateSSMDebitVoucher() {
+        const fundVal = document.getElementById("fundSelect").value;
+        if (fundVal !== "SSM") {
+            alert('Please select "SSM" as the Fund Head above before generating the SSM Debit Voucher.');
+            return;
+        }
+
+        const payeeVal = document.getElementById("payeeSelect").value;
+        const finalPayee = payeeVal === "MANUAL"
+            ? (document.getElementById("manualPayeeInput").value || "Self")
+            : (payeeVal || "Self");
+
+        const finalPurpose = (document.getElementById("purposeInput").value || "").trim();
+
+        const chqVal = document.getElementById("chqType").value;
+        const chqNo = (document.getElementById("chqNo").value || "").trim();
+        const chqDateRaw = document.getElementById("chqDate").value;
+        const amountRaw = document.getElementById("expAmount").value;
+        const amountNum = parseFloat(amountRaw) || 0;
+        const amountWords = numToWords(amountNum);
+
+        // "Cheque No. & Date" field on the voucher, formatted like the legacy vouchers
+        // e.g. "784951 dt. 08-11-2019"
+        let chqDetails = chqNo;
+        if (chqDateRaw) {
+            const [y, m, d] = chqDateRaw.split('-');
+            if (y && m && d) chqDetails += (chqDetails ? ' dt. ' : 'dt. ') + `${d}-${m}-${y}`;
+        }
+
+        const voucherDate = chqDateRaw || todayISO();
+        const escapeHtml = (s) => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        const html = buildSSMDebitVoucherHTML({
+            voucherDate,
+            toWhomPaid: escapeHtml(finalPayee),
+            purpose: escapeHtml(finalPurpose),
+            amountNum: amountNum ? amountNum : '',
+            amountWords: escapeHtml(amountWords || 'Rupees Only'),
+            chqDetails: escapeHtml(chqDetails),
+            chqType: escapeHtml(chqVal === "MANUAL" ? (document.getElementById("manualChqTypeInput").value || "") : chqVal)
+        });
+
+        const win = window.open('', '_blank');
+        if (!win) { alert("Please allow pop-ups to view/print the SSM Debit Voucher."); return; }
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+    }
+
+    // Returns the full standalone HTML document for the SSM "Payment (Debit Voucher)",
+    // matching the design of the ssm_debit.html template, with the given values filled in.
+    function buildSSMDebitVoucherHTML(v) {
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment (Debit Voucher)</title>
+<style>
+* { box-sizing: border-box; font-family: 'Lucida Bright', 'Lucida Fax', Lucida, Georgia, serif; }
+body { background-color: #f4f6f9; margin: 0; padding: 10px; }
+.voucher-container {
+    background: #ffffff; width: 210mm; height: 297mm; margin: 0 auto; padding: 40px 45px;
+    border: 4px double #000; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: flex; flex-direction: column; justify-content: space-between; position: relative;
+}
+.voucher-container::before {
+    content: ""; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+    border: 1px solid #000; pointer-events: none;
+}
+.header { text-align: center; font-weight: bold; margin-bottom: 20px; line-height: 1.6; border-bottom: 3px double #000; padding-bottom: 12px; }
+.header h2 { margin: 0 0 6px 0; font-size: 28px; letter-spacing: 1.5px; color: #000; }
+.header h3 { margin: 0; font-size: 20px; color: #000; letter-spacing: 1px; }
+.meta-section { width: 100%; margin-bottom: 20px; }
+.meta-row { display: flex; align-items: flex-start; margin-bottom: 10px; font-size: 16px; font-weight: bold; }
+.meta-label { white-space: nowrap; color: #000; padding-top: 6px; }
+.meta-input-flex { flex-grow: 1; margin-left: 10px; }
+select, input[type="text"], input[type="number"], input[type="date"], textarea {
+    width: 100%; border: none; border-bottom: 1px dashed #000; padding: 4px 6px; font-size: 16px;
+    font-weight: bold; background-color: #fcfdfe; outline: none; resize: none;
+}
+#schoolNameSelect { font-size: 18px; font-weight: bold; color: #000; border-bottom: 1px solid #000; cursor: pointer; white-space: normal; height: auto; line-height: 1.4; }
+#manualSchoolInput { font-size: 18px; font-weight: bold; color: #000; white-space: normal; height: auto; line-height: 1.4; }
+.grid-split { display: flex; justify-content: space-between; margin-bottom: 20px; }
+.left-spacer { width: 45%; }
+.right-info-table { width: 55%; border-collapse: collapse; }
+.right-info-table td { border: 1px solid #000; padding: 6px 8px; font-size: 16px; }
+.right-info-table td input { font-size: 16px; text-align: center; }
+.right-info-table td:first-child { width: 45%; background-color: #f8f9fa; font-weight: bold; }
+.form-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+.form-table td { border: 1px solid #000; padding: 10px 12px; vertical-align: middle; font-size: 16px; }
+.form-table td:first-child { width: 25%; font-weight: bold; background-color: #f8f9fa; color: #000; }
+.purpose-textarea { font-family: inherit; font-size: 16px; line-height: 1.5; height: auto; min-height: 50px; overflow: hidden; display: block; }
+.amount-word-display { font-weight: bold; font-style: italic; color: #000; padding-top: 6px; display: block; font-size: 16px; }
+.cheque-font-target { font-family: 'Lucida Bright', 'Lucida Fax', Lucida, Georgia, serif !important; font-weight: bold !important; font-size: 16px !important; }
+.signature-auth-row { display: flex; justify-content: space-around; margin-top: 35px; margin-bottom: 25px; text-align: center; font-weight: bold; }
+.sig-box { width: 240px; border-top: 1px dashed #000; padding-top: 6px; font-size: 16px; }
+.receipt-section { border-top: 2px dashed #000; padding-top: 30px; margin-top: auto; }
+.receipt-row { display: flex; flex-wrap: wrap; align-items: center; line-height: 2.4; font-size: 16px; }
+.inline-label { font-weight: bold; margin-right: 8px; color: #000; }
+.inline-fill { border-bottom: 1px dashed #000; padding: 0 10px; font-weight: bold; min-width: 130px; background-color: #fcfdfe; font-size: 16px; }
+.receipt-signature { display: flex; flex-direction: column; align-items: flex-end; margin-top: 35px; padding-right: 15px; }
+.receipt-signature .line { width: 260px; border-top: 1px dashed #000; margin-bottom: 6px; }
+.receipt-signature .text { font-weight: bold; width: 260px; text-align: center; font-size: 16px; }
+.no-print { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+.print-btn { background-color: #111; color: white; border: 2px solid #fff; padding: 14px 40px; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: all 0.2s ease; }
+.print-btn:hover { background-color: #333; transform: scale(1.05); }
+@media print {
+    body { background: none; padding: 0; margin: 0; }
+    .voucher-container { border: 2px solid #000; width: 210mm; height: 297mm; box-shadow: none; padding: 40px 45px; margin: 0; page-break-inside: avoid; }
+    .voucher-container::before { border: 1px solid #000; }
+    body[data-school-mode="MANUAL"] #schoolNameSelect { display: none !important; }
+    body[data-head-mode="MANUAL"] #headAccount { display: none !important; }
+    select, input[type="text"], input[type="number"], input[type="date"], textarea, .inline-fill {
+        background-color: transparent !important; border-bottom: none !important; padding: 2px 0 !important;
+    }
+    select { appearance: none; -webkit-appearance: none; }
+    .form-table td, .right-info-table td { background-color: transparent !important; border: 1px solid #000 !important; }
+    .no-print { display: none !important; }
+    textarea { overflow: visible !important; height: auto !important; }
+}
+</style>
+</head>
+<body data-school-mode="DEFAULT" data-head-mode="DEFAULT">
+
+<div class="no-print">
+    <button class="print-btn" id="triggerPrintBtn">Print Voucher Sheet</button>
+</div>
+
+<div class="voucher-container">
+    <div>
+        <div class="header">
+            <h2>PAYMENT (DEBIT VOUCHER)</h2>
+            <h3>SSA/ RMSA, BANKURA</h3>
+        </div>
+
+        <div class="meta-section">
+            <div class="meta-row">
+                <div class="meta-label">NAME OF THE CLRC/VEC/WEC :</div>
+                <div class="meta-input-flex">
+                    <select id="schoolNameSelect" onchange="toggleManualSchool(this)">
+                        <option value="TALDANGRA FULMATI HIGH SCHOOL [H.S.]" selected>TALDANGRA FULMATI HIGH SCHOOL [H.S.]</option>
+                        <option value="BANKURA ZILLA SCHOOL">BANKURA ZILLA SCHOOL</option>
+                        <option value="MANUAL">OTHER SCHOOL (MANUAL ENTRY)</option>
+                    </select>
+                    <textarea id="manualSchoolInput" rows="2" style="display: none; margin-top: 8px;" placeholder="Type Custom School Name Manually Here..."></textarea>
+                </div>
+            </div>
+            <div class="meta-row">
+                <div class="meta-label">NAME OF THE CIRCLE :</div>
+                <div class="meta-input-flex">
+                    <input type="text" id="circleName" value="TALDANGRA">
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-split">
+            <div class="left-spacer"></div>
+            <table class="right-info-table">
+                <tr><td><strong>Debit Voucher No.</strong></td><td><input type="text" id="voucherNo" value="" style="font-weight: bold;"></td></tr>
+                <tr><td><strong>Date</strong></td><td><input type="date" id="voucherDate" value="${v.voucherDate}"></td></tr>
+                <tr><td><strong>File No.</strong></td><td><input type="text" id="fileNo"></td></tr>
+                <tr><td><strong>NSP No.</strong></td><td><input type="text" id="nspNo"></td></tr>
+                <tr><td><strong>Cash Book Page No.</strong></td><td><input type="text" id="cashBookPage"></td></tr>
+            </table>
+        </div>
+
+        <table class="form-table">
+            <tr>
+                <td>Head of Account</td>
+                <td>
+                    <select id="headAccount" onchange="checkHeadAccount(this)">
+                        <option value="Infrastructure Grant">Infrastructure Grant</option>
+                        <option value="Civil works">Civil works</option>
+                        <option value="School Development Grant">School Development Grant</option>
+                        <option value="Maintenance Grant">Maintenance Grant</option>
+                        <option value="RAA GRANT">RAA GRANT</option>
+                        <option value="WBP EXAM GRANT">WBP EXAM GRANT</option>
+                        <option value="Development">Development</option>
+                        <option value="Uniform Grant">Uniform Grant</option>
+                        <option value="VIDYASAGAR GRANT">VIDYASAGAR GRANT</option>
+                        <option value="STUDY TRIP GRANT">STUDY TRIP GRANT</option>
+                        <option value="Other Training">Other Training</option>
+                        <option value="Composite Grant">Composite Grant</option>
+                        <option value="Sc Exibition & Competition for VII,VIII Grant">Sc Exibition & Competition for VII,VIII Grant</option>
+                        <option value="Nirmal Vidyalay Saptaha Grant">Nirmal Vidyalay Saptaha Grant</option>
+                        <option value="Obsevation of Independence Day Grant">Obsevation of Independence Day Grant</option>
+                        <option value="Obsevation of Republic Day Grant">Obsevation of Republic Day Grant</option>
+                        <option value="Transfer from RMSA due Closing of RMSA A/c">Transfer from RMSA due Closing of RMSA A/c</option>
+                        <option value="EXCURSION TRIP RAA">EXCURSION TRIP RAA</option>
+                        <option value="EXPOSURE VISIT GRANT [SSA]">EXPOSURE VISIT GRANT [SSA]</option>
+                        <option value="Exterior School Building Painting Grant">Exterior School Building Painting Grant</option>
+                        <option value="TWINING OF SCHOOL PROGRAMME GRANT">TWINING OF SCHOOL PROGRAMME GRANT</option>
+                        <option value="ANANDA PARISAR QUIZ">ANANDA PARISAR QUIZ</option>
+                        <option value="MANUAL">-- Type Custom Head Manual --</option>
+                    </select>
+                    <input type="text" id="customHeadAccount" style="display:none; margin-top:8px;" placeholder="Enter custom Head/Miscellaneous entry...">
+                </td>
+            </tr>
+            <tr><td>To Whom Paid</td><td><input type="text" id="toWhomPaid" value="${v.toWhomPaid}"></td></tr>
+            <tr>
+                <td>Purpose of Payment</td>
+                <td><textarea class="purpose-textarea" id="purpose" rows="2" oninput="autoGrow(this)">${v.purpose}</textarea></td>
+            </tr>
+            <tr>
+                <td>Amount of Cash/Cheque Rs.</td>
+                <td>
+                    <input type="number" id="amountNum" value="${v.amountNum}" oninput="updateAmountWords()" style="font-weight: bold;">
+                    <span class="amount-word-display" id="amountWords">${v.amountWords}</span>
+                </td>
+            </tr>
+            <tr><td>Cheque No. & Date</td><td><input type="text" id="chequeDetails" class="cheque-font-target" value="${v.chqDetails}"></td></tr>
+        </table>
+
+        <div class="signature-auth-row">
+            <div class="sig-box">Administrator</div>
+            <div class="sig-box">President</div>
+        </div>
+    </div>
+
+    <div class="receipt-section">
+        <div class="receipt-row">
+            <span class="inline-label">Received a sum of Rs.</span>
+            <span class="inline-fill" id="recAmountNum" style="min-width: 90px;">${v.amountNum}</span>
+            <span class="inline-fill" id="recAmountWords" style="flex-grow: 1; margin-left: 10px;">${v.amountWords}</span>
+        </div>
+        <div class="receipt-row" style="margin-top: 10px;">
+            <span class="inline-label">by cheque bearing No.</span>
+            <span class="inline-fill" id="recChequeDetails" style="flex-grow: 1;">${v.chqDetails}</span>
+        </div>
+
+        <div class="receipt-signature">
+            <div class="line"></div>
+            <div class="text">Signature of Recipient</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('triggerPrintBtn').addEventListener('click', function() { window.print(); });
+
+    function autoGrow(element) {
+        element.style.height = "auto";
+        element.style.height = (element.scrollHeight) + "px";
+    }
+    window.addEventListener('load', function() { autoGrow(document.getElementById('purpose')); });
+
+    function toggleManualSchool(selectElement) {
+        const manualInput = document.getElementById('manualSchoolInput');
+        if (selectElement.value === 'MANUAL') {
+            manualInput.style.display = 'block';
+            document.body.setAttribute('data-school-mode', 'MANUAL');
+            manualInput.focus();
+        } else {
+            manualInput.style.display = 'none';
+            document.body.setAttribute('data-school-mode', 'DEFAULT');
+        }
+    }
+
+    function checkHeadAccount(selectElement) {
+        const customInput = document.getElementById('customHeadAccount');
+        if (selectElement.value === 'MANUAL') {
+            customInput.style.display = 'block';
+            document.body.setAttribute('data-head-mode', 'MANUAL');
+            customInput.focus();
+        } else {
+            customInput.style.display = 'none';
+            document.body.setAttribute('data-head-mode', 'DEFAULT');
+        }
+    }
+
+    document.getElementById('chequeDetails').addEventListener('input', function() {
+        document.getElementById('recChequeDetails').innerText = this.value;
+    });
+
+    function numberToWords(num) {
+        if (num === 0) return 'Zero';
+        const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        function convertLessThanOneThousand(n) {
+            if (n === 0) return '';
+            let str = '';
+            if (n >= 100) { str += a[Math.floor(n / 100)] + ' Hundred '; n %= 100; }
+            if (n >= 20) { str += b[Math.floor(n / 10)] + ' '; n %= 10; }
+            if (n > 0) { str += a[n] + ' '; }
+            return str.trim();
+        }
+        let word = '';
+        let lakhs = Math.floor(num / 100000); num %= 100000;
+        let thousands = Math.floor(num / 1000); num %= 1000;
+        if (lakhs > 0) word += convertLessThanOneThousand(lakhs) + ' Lakh ';
+        if (thousands > 0) word += convertLessThanOneThousand(thousands) + ' Thousand ';
+        if (num > 0) word += convertLessThanOneThousand(num);
+        return word.trim();
+    }
+
+    function updateAmountWords() {
+        const numInput = document.getElementById('amountNum').value;
+        const targetWordsDisplay = document.getElementById('amountWords');
+        const targetRecNum = document.getElementById('recAmountNum');
+        const targetRecWords = document.getElementById('recAmountWords');
+        if (numInput) {
+            const words = "Rupees " + numberToWords(parseInt(numInput)) + " Only";
+            targetWordsDisplay.innerText = words;
+            targetRecWords.innerText = words;
+            targetRecNum.innerText = numInput;
+        } else {
+            targetWordsDisplay.innerText = "Rupees Only";
+            targetRecWords.innerText = "Rupees Only";
+            targetRecNum.innerText = "";
+        }
+    }
+<\/script>
+</body>
+</html>`;
     }
 
     function saveEntry(e) {

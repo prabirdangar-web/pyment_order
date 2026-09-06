@@ -662,11 +662,12 @@
 
         <div class="btn-group" style="justify-content:flex-start;flex-wrap:wrap;gap:8px;">
             <button type="button" class="btn btn-primary" onclick="generateSelectedChequeRegDocument('notice')">📄 Notice</button>
-            <button type="button" class="btn btn-primary" onclick="generateSelectedChequeRegDocument('resolution')">📄 Resolution</button>
+            <button type="button" class="btn btn-primary" onclick="generateSelectedChequeRegDocument('resolution')">📄 Meeting / Resolution</button>
             <button type="button" class="btn btn-primary" onclick="generateSelectedChequeRegDocument('hoi')">📄 HOI Report</button>
             <button type="button" class="btn btn-primary" onclick="generateSelectedChequeRegDocument('admin')">📄 Administrator Order</button>
             <button type="button" class="btn btn-primary" onclick="generateSelectedChequeRegDocument('voucher')">📄 Payment Voucher</button>
             <button type="button" class="btn btn-primary" onclick="generateSelectedChequeRegDocument('forwarding')">📄 Forwarding Letter</button>
+            <button type="button" class="btn btn-slips" onclick="generateSelectedChequeRegDocument('payslips')">🎫 Pay Order Slips</button>
             <button type="button" class="btn btn-suite" onclick="generateSelectedChequeRegDocument('combined')">📑 Complete Suite</button>
             <button type="button" class="btn btn-secondary" onclick="toggleAllChequeRegSelect(false)">Clear Selection</button>
             <span id="cregSelectionCount" style="align-self:center;font-size:13px;color:#64748B;font-weight:600;">No rows selected.</span>
@@ -2507,9 +2508,44 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             });
     }
 
-    // ---------- Letter / Order / Report generator from SELECTED rows ----------
+    // ---------- Unified document generator for ALL cheque entries ----------
+    // Historical/legacy entries and newly entered cheque rows are converted to the
+    // exact same data shape used by the Step-3 NEW document suite.  Therefore the
+    // old register can never fall back to a different notice/resolution/HOI/order/
+    // pay-slip design.
+    function chequeRowToNewTemplateEntry(r) {
+        const account = String(r.acc || r.account || '').trim();
+        let fund = account;
+        const m = account.match(/\(([^)]+)\)|\[([^\]]+)\]/);
+        if (m) fund = (m[1] || m[2] || account).replace(/\bFUND\b/i, '').trim();
+        if (!fund) fund = 'GENERAL';
 
-    // Generates Notice, Resolution, HOI Report, Administrator Order and Voucher from the selected Cheque Register rows only.
+        return {
+            id: r.id,
+            fund: fund,
+            account: account,
+            payee: String(r.to || r.payee || '').trim(),
+            purpose: String(r.purpose || '').trim(),
+            chqType: String(r.chqType || r.chequeType || 'A/C Payee Only').trim(),
+            chqNo: String(r.chNo || r.chequeNo || '').trim(),
+            date: r.dated || r.doi || r.date || todayISO(),
+            amount: Number(r.amount || 0)
+        };
+    }
+
+    function withSelectedChequeRowsAsNewTemplate(rows, callback) {
+        const oldEntries = sessionEntries;
+        const selectedNewEntries = rows.map(chequeRowToNewTemplateEntry);
+        try {
+            // Temporarily feed the selected historical/current register rows into
+            // the SAME generator used by newly entered Step-1 payments.
+            sessionEntries = selectedNewEntries;
+            return callback(selectedNewEntries);
+        } finally {
+            sessionEntries = oldEntries;
+        }
+    }
+
     function generateSelectedChequeRegDocument(type) {
         const rows = chequeRegisterEntries
             .filter(e => selectedChequeRegIds.has(e.id))
@@ -2520,45 +2556,86 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             return;
         }
 
-        /*
-         * OLD/LEGACY and CURRENT/NEW entries intentionally use the SAME
-         * document-generation templates.  The user only chooses the document
-         * required; there is no second OLD/CURRENT choice.
-         *
-         * This also means a historical cheque already present in the register
-         * can be selected later and a Payment Voucher (or any other document)
-         * can be generated exactly like a current entry.
-         */
-        let docHtml = '';
-
-        switch (type) {
-            case 'notice':
-                docHtml = buildSelectedChequeNoticeHTML(rows);
-                break;
-            case 'resolution':
-                docHtml = buildSelectedChequeResolutionHTML(rows);
-                break;
-            case 'hoi':
-                docHtml = buildSelectedChequeHOIHTML(rows);
-                break;
-            case 'admin':
-                docHtml = buildSelectedChequeAdminHTML(rows);
-                break;
-            case 'voucher':
-                docHtml = buildSelectedChequeVoucherHTML(rows);
-                break;
-            case 'forwarding':
-                docHtml = buildSelectedChequeForwardingHTML(rows);
-                break;
-            case 'combined':
-                docHtml = buildChequeRegSelectionSuiteHTML(rows);
-                break;
-            default:
-                alert('Invalid document type.');
-                return;
+        if (type === 'payslips') {
+            withSelectedChequeRowsAsNewTemplate(rows, () => generateExactSelectedPaySlips(rows));
+            return;
         }
 
-        openLetterWindow(docHtml);
+        withSelectedChequeRowsAsNewTemplate(rows, () => generateExactSelectedSuitePage(type, rows));
+    }
+
+    // Generate the exact NEW Step-3 four-page suite, then print/open only the
+    // requested page.  This makes historical and current entries visually and
+    // structurally identical.
+    function generateExactSelectedSuitePage(type, rows) {
+        const targetIndex = { notice: 0, resolution: 1, hoi: 2, admin: 3 }[type];
+        if (targetIndex === undefined) {
+            // Voucher/forwarding remain available as their dedicated register
+            // documents, while Complete Suite is the exact four-page NEW suite.
+            if (type === 'combined') {
+                compileConsolidatedSuite();
+                return;
+            }
+            const fallback = type === 'voucher'
+                ? buildSelectedChequeVoucherHTML(rows)
+                : buildSelectedChequeForwardingHTML(rows);
+            openLetterWindow(fallback);
+            return;
+        }
+
+        compileConsolidatedSuite();
+        const container = document.getElementById('suiteInnerContainer');
+        const pages = container ? Array.from(container.querySelectorAll('.a4-page')) : [];
+        if (!pages[targetIndex]) {
+            alert('Could not prepare the selected document page.');
+            return;
+        }
+
+        // Copy the already-rendered NEW template page into a standalone print
+        // window.  No historical template is used here.
+        const pageHtml = pages[targetIndex].outerHTML;
+        openLetterWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Selected Cheque Document</title><style>
+            @page{size:A4;margin:0}html,body{margin:0;padding:0;background:#fff;color:#000}
+            .a4-page{width:210mm;height:297mm;padding:18mm 19.05mm 16mm 19.05mm;box-sizing:border-box;
+            margin:0 auto;position:relative;background:#fff;page-break-after:always;overflow:hidden;color:#111}
+            .binding-gutter{position:absolute;top:0;left:0;bottom:0;width:12mm;border-right:1px dashed #999;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly}
+            .binding-gutter span{width:7px;height:7px;border-radius:50%;border:1px solid #000;background:#fff}
+            .record-stamp{position:absolute;top:8mm;right:19.05mm;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#000;font-weight:600}
+            .audit-footer{position:absolute;bottom:8mm;left:19.05mm;right:19.05mm;display:flex;justify-content:space-between;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:#000;border-top:1px solid #000;padding-top:4px}
+            .a4-fit{transform-origin:top left;width:100%}.doc-body-text{text-align:justify;line-height:1.55}
+            .doc-title{text-align:center;text-transform:uppercase;font-size:17px;font-weight:bold;letter-spacing:.6px;text-decoration:underline;margin-bottom:16px;color:#000}
+            .doc-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-bottom:18px;font-weight:600;font-size:12.5px;background:#fff;padding:10px 14px;border:1px solid #000;border-radius:3px;color:#000}
+            table{width:100%;border-collapse:collapse;text-align:left;font-size:14px;table-layout:fixed}th,td{border:1px solid #000;padding:9px 10px;vertical-align:top;word-wrap:break-word;color:#000;background:#fff}th{text-align:center}
+            .doc-footer{margin-top:25px;display:flex;justify-content:space-between;font-weight:600;font-size:13px}
+            @media print{.print{display:none!important}}
+        </style></head><body><button class="print" onclick="window.print()" style="position:fixed;right:15px;top:15px;padding:10px 18px;background:#111;color:#fff;border:0">Print</button>${pageHtml}</body></html>`);
+    }
+
+    // Exact NEW Pay Order Slip layout for selected historical/current cheque rows.
+    function generateExactSelectedPaySlips(rows) {
+        compilePayOrderSlips();
+        const container = document.getElementById('slipsInnerContainer');
+        if (!container) return;
+        const wrappers = Array.from(container.querySelectorAll('.a4-page-slip-wrapper'));
+        if (!wrappers.length) {
+            alert('Could not prepare the selected Pay Order Slips.');
+            return;
+        }
+        const html = wrappers.map(w => w.outerHTML).join('');
+        openLetterWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pay Order Slips</title><style>
+            @page{size:A4;margin:0}html,body{margin:0;padding:0;background:#fff;color:#000}
+            .a4-page-slip-wrapper{width:210mm;height:297mm;margin:0 auto;page-break-after:always;page-break-inside:avoid;display:flex;flex-direction:column;position:relative;padding-left:19.05mm;padding-right:19.05mm;box-sizing:border-box;overflow:hidden}
+            .binding-gutter{position:absolute;top:0;left:0;bottom:0;width:12mm;border-right:1px dashed #999;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly}
+            .binding-gutter span{width:7px;height:7px;border-radius:50%;border:1px solid #000;background:#fff}
+            .a4-slip-compressed{height:148mm;border:2px solid #000;padding:15px 25px;background:#fff;color:#000;overflow:hidden;position:relative;box-sizing:border-box}
+            .slip-fit{display:flex;flex-direction:column;justify-content:space-between;transform-origin:top left;height:100%;width:100%}
+            .slip-banner-wrap{text-align:center;margin-bottom:6px}.slip-banner{display:inline-block;padding:4px 30px;border:2px solid #000;border-radius:50% / 100%;background:#fff;color:#000;font-size:13px;font-weight:bold;letter-spacing:2.5px;text-transform:uppercase}
+            .school-header-title{text-align:center;font-size:16px;font-weight:bold;text-transform:uppercase;margin-bottom:1px;color:#000}.school-header-sub{text-align:center;font-size:11px;font-weight:600;margin-bottom:8px;border-bottom:2px solid #000;padding-bottom:4px;color:#000}
+            .slip-ref-block{background:#fff;border:1px solid #000;border-radius:3px;padding:6px 10px;margin-bottom:8px;color:#000}.slip-ref-line{font-size:11.5px}.slip-ref-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:10.5px;margin-top:3px;padding-top:3px;border-top:1px dotted #000}
+            .slip-row{display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px}.slip-label{font-weight:bold;width:160px}.slip-value{flex-grow:1;border-bottom:1px dotted #000;padding-left:5px}
+            .slip-table{width:100%;margin-top:8px;border:1px solid #000;border-collapse:collapse;table-layout:fixed}.slip-table th,.slip-table td{border:1px solid #000;padding:5px 8px;font-size:11px;color:#000;word-wrap:break-word}.slip-table th{background:#fff}.doc-footer{margin-top:25px;display:flex;justify-content:space-between;font-weight:600;font-size:13px}.receipt-counterpart{margin-top:8px;border-top:1px dashed #000;padding-top:6px}.receipt-title{text-align:center;font-size:11px;font-weight:bold;text-transform:uppercase;margin-bottom:5px;color:#000}
+            @media print{.print{display:none!important}}
+        </style></head><body><button class="print" onclick="window.print()" style="position:fixed;right:15px;top:15px;padding:10px 18px;background:#111;color:#fff;border:0">Print</button>${html}</body></html>`);
     }
 
     function selectedChequeCommonTable(rows) {

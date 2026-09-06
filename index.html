@@ -2030,11 +2030,10 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     // Separate Firestore document so this never interferes with the existing
     // "ledgerEntries" (pay-order) workflow above. Same auth/session (currentUser).
     const chequeRegDocRef = db.doc("tfhs/chequeRegisterEntries");
-    // Delete-password is kept locally in this browser.
-    // This avoids Firestore permission failures on /tfhs/appSettings and keeps
-    // the delete confirmation separate from the Firebase sign-in password.
+    // Shared delete-confirmation password.
+    // It is stored in the already-authorized chequeRegisterEntries document,
+    // so the same password is available on every computer/browser after sign-in.
     let deletePasswordCache = null;
-    const DELETE_PASSWORD_STORAGE_KEY = "tfhs_delete_confirmation_password";
     let chequeRegisterEntries = [];
     let chequeRegSeeded = false;
     let selectedChequeRegIds = new Set();
@@ -2050,6 +2049,14 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 ? data.entries.map(e => ({ ...e, inWords: e.inWords || numToWords(e.amount) }))
                 : [];
             chequeRegSeeded = !!(data && data.seeded);
+
+            // Load the shared delete password from Firebase so it is identical
+            // on every signed-in computer/browser.
+            if (data && data.deletePassword) {
+                deletePasswordCache = data.deletePassword;
+            } else {
+                deletePasswordCache = null;
+            }
             // Drop selections for rows that no longer exist so the count stays accurate.
             const liveIds = new Set(chequeRegisterEntries.map(e => e.id));
             selectedChequeRegIds.forEach(id => { if (!liveIds.has(id)) selectedChequeRegIds.delete(id); });
@@ -2069,36 +2076,42 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     }
 
     // ---------- Password-gated delete protection ----------
-    // A secondary confirmation password (separate from the sign-in password) that must
-    // be entered correctly before ANY delete action fires — protects against an
-    // absent-minded click on a Delete button. Stored in a shared settings document so
-    // any signed-in admin can set/rotate it; it never overwrites or "hampers" any of
-    // the ledger/register entries themselves.
+    // A secondary confirmation password (separate from the Firebase sign-in password)
+    // is stored in the same Firestore document already used by the Cheque Issue Register.
+    // Therefore one password is shared across all computers/browsers.
     function initAppSettingsSync() {
-        // No Firestore read/write is required for the delete confirmation password.
-        // Loading it locally prevents the previous "Missing or insufficient permissions"
-        // error caused by a Firestore rule that does not allow /tfhs/appSettings writes.
-        try {
-            deletePasswordCache = localStorage.getItem(DELETE_PASSWORD_STORAGE_KEY) || null;
-        } catch (err) {
-            console.warn("Could not read local delete password:", err);
-            deletePasswordCache = null;
-        }
+        // Kept as a compatibility function because it is called during startup.
+        // The actual password is loaded by initChequeRegisterSync() below.
     }
 
     function promptSetDeletePassword() {
         if (!currentUser) { alert("Please sign in first."); return; }
-        const newPass = prompt("Set (or change) the Delete Confirmation Password.\nThis will be required before any Delete button works, to guard against accidental deletes.\nLeave blank to cancel:");
+
+        const newPass = prompt(
+            "Set (or change) the Delete Confirmation Password.\n" +
+            "This password will be shared through Firebase and used on every computer/browser.\n" +
+            "Leave blank to cancel:"
+        );
         if (!newPass) return;
+
         const confirmPass = prompt("Re-enter the password to confirm:");
-        if (newPass !== confirmPass) { alert("Passwords did not match — nothing was changed."); return; }
-        try {
-            localStorage.setItem(DELETE_PASSWORD_STORAGE_KEY, newPass);
-            deletePasswordCache = newPass;
-            alert("Delete confirmation password has been set/updated on this browser.");
-        } catch (err) {
-            alert("Could not save the delete password in this browser: " + err.message);
+        if (newPass !== confirmPass) {
+            alert("Passwords did not match — nothing was changed.");
+            return;
         }
+
+        chequeRegDocRef.set({
+            deletePassword: newPass,
+            deletePasswordUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            deletePasswordUpdatedBy: currentUser.email || ""
+        }, { merge: true })
+        .then(() => {
+            deletePasswordCache = newPass;
+            alert("Delete confirmation password saved to Firebase. It will now work on every computer/browser.");
+        })
+        .catch(err => {
+            alert("Could not save the delete password to Firebase: " + err.message);
+        });
     }
 
     function verifyDeletePassword() {

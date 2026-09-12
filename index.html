@@ -469,6 +469,19 @@
                 </div>
             </div>
 
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="receivedFromInput">Fund Received From (Source) — Optional</label>
+                    <input type="text" id="receivedFromInput" placeholder="e.g. West Bengal Council of Higher Secondary Education / DI Office Bankura / SSM, Bankura — leave blank if not applicable">
+                    <div style="font-size:11px; color:#64748B; margin-top:4px;">Describes where this fund originally came from (source / sanctioning authority / letter reference). May be left blank in cases where not applicable.</div>
+                </div>
+                <div class="form-group">
+                    <label for="receivedDateInput">Received &amp; Deposited in Bank A/c on — Optional</label>
+                    <input type="date" id="receivedDateInput">
+                    <div style="font-size:11px; color:#64748B; margin-top:4px;">Date the fund was credited/deposited into the linked bank account. May be left blank.</div>
+                </div>
+            </div>
+
             <div class="btn-group">
                 <button type="button" class="btn" style="background-color:#8E44AD;color:#fff;" onclick="generateSSMDebitVoucher()">🧾 Generate SSM Debit Voucher</button>
                 <button type="button" class="btn" style="background-color:#16A085;color:#fff;" onclick="generateVocationalTransferLetter()">🏦 Generate Vocational Transfer Letter</button>
@@ -483,14 +496,16 @@
     <div class="table-container">
         <table>
             <colgroup>
-                <col style="width: 14%;">
-                <col style="width: 14%;">
-                <col style="width: 18%;">
-                <col style="width: 14%;">
-                <col style="width: 12%;">
                 <col style="width: 11%;">
+                <col style="width: 11%;">
+                <col style="width: 14%;">
+                <col style="width: 10%;">
+                <col style="width: 9%;">
+                <col style="width: 9%;">
+                <col style="width: 10%;">
                 <col style="width: 13%;">
                 <col style="width: 8%;">
+                <col style="width: 5%;">
             </colgroup>
             <thead>
                 <tr>
@@ -501,12 +516,14 @@
                     <th>Cheque No</th>
                     <th>Date</th>
                     <th class="text-right">Amount (₹)</th>
+                    <th>Received From (Source)</th>
+                    <th>Recd./Deposit Date</th>
                     <th>Action</th>
                 </tr>
             </thead>
             <tbody id="logTableBody">
                 <tr>
-                    <td colspan="8" style="text-align: center; color: #7f8c8d;">No records generated yet in this active session.</td>
+                    <td colspan="10" style="text-align: center; color: #7f8c8d;">No records generated yet in this active session.</td>
                 </tr>
             </tbody>
         </table>
@@ -1552,6 +1569,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             date: document.getElementById("chqDate").value,
             amount: parseFloat(document.getElementById("expAmount").value).toFixed(2),
             purpose: finalPurpose,
+            receivedFrom: document.getElementById("receivedFromInput").value.trim(),
+            receivedDate: document.getElementById("receivedDateInput").value,
             createdAt: new Date().toISOString(),
             createdBy: currentUser.email
         };
@@ -1603,6 +1622,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 <td>${entry.chqNo}</td>
                 <td>${formatDate(entry.date)}</td>
                 <td class="text-right">₹${entry.amount}</td>
+                <td>${entry.receivedFrom || '<span style="color:#B0B8C1;">—</span>'}</td>
+                <td>${entry.receivedDate ? formatDate(entry.receivedDate) : '<span style="color:#B0B8C1;">—</span>'}</td>
                 <td style="text-align:center;">
                     <button type="button" class="btn-danger-row" ${currentUser ? '' : 'disabled'} onclick="deleteEntry('${entry.id}')">Delete</button>
                 </td>
@@ -1616,6 +1637,21 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             groups[item.fund].push(item);
             return groups;
         }, {});
+    }
+
+    // Builds a small inline note describing where a fund payment's underlying money
+    // was originally received from and when it was deposited into the bank account.
+    // Both source fields on the entry are optional, so this renders only the parts
+    // that were actually filled in, and renders nothing at all when both are blank.
+    function fundReceiptNote(item) {
+        const src = (item && item.receivedFrom) ? String(item.receivedFrom).trim() : "";
+        const dt = (item && item.receivedDate) ? formatDate(item.receivedDate) : "";
+        if (!src && !dt) return "";
+        let text = "Fund received";
+        if (src) text += ` from <strong>${src}</strong>`;
+        if (dt) text += ` &amp; deposited in Bank A/c on <strong>${dt}</strong>`;
+        text += ".";
+        return `<br><span style="font-size:11px;color:#0B2545;">${text}</span>`;
     }
 
     function formatDate(dateString) {
@@ -1745,7 +1781,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 grouped[fundName].forEach(item => {
                     sl++;
                     grandTotal += parseFloat(item.amount) || 0;
-                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td>${item.purpose}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td>${item.purpose}${fundReceiptNote(item)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
                 });
             }
             let summary = "";
@@ -1813,7 +1849,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 grouped[fundName].forEach(item => {
                     sl++;
                     grandTotal += parseFloat(item.amount) || 0;
-                    rows += `<tr><td style="text-align:center;">${sl}</td><td>${item.payee}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.purpose}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td>${item.payee}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.purpose}${fundReceiptNote(item)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
                 });
             }
             let summary = "";
@@ -1857,7 +1893,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 grouped[fundName].forEach(item => {
                     sl++;
                     grandTotal += parseFloat(item.amount) || 0;
-                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td>As noted in HOI report</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span>${fundReceiptNote(item)}</td><td>${item.payee}</td><td>As noted in HOI report</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
                 });
             }
             let summary = "";

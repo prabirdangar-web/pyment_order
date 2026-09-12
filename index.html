@@ -1639,14 +1639,17 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         }, {});
     }
 
-    // Builds a small inline note describing where a fund payment's underlying money
-    // was originally received from and when it was deposited into the bank account.
-    // Both source fields on the entry are optional, so this renders only the parts
-    // that were actually filled in, and renders nothing at all when both are blank.
-    function fundReceiptNote(item) {
-        const src = (item && item.receivedFrom) ? String(item.receivedFrom).trim() : "";
-        const dt = (item && item.receivedDate) ? formatDate(item.receivedDate) : "";
-        if (!src && !dt) return "";
+    // Builds a small note describing where a fund's underlying money was originally
+    // received from and when it was deposited into the bank account. This is shown
+    // ONCE per fund head in the main order documents (not repeated on every payment
+    // row against that fund). Looks across all of that fund's entries and uses the
+    // first one that actually has a source and/or date filled in; if none of the
+    // entries under that fund head have this info, returns "" (nothing is shown).
+    function fundReceiptNoteForGroup(items) {
+        const withData = (items || []).find(it => (it.receivedFrom && String(it.receivedFrom).trim()) || it.receivedDate);
+        if (!withData) return "";
+        const src = withData.receivedFrom ? String(withData.receivedFrom).trim() : "";
+        const dt = withData.receivedDate ? formatDate(withData.receivedDate) : "";
         let text = "Fund received";
         if (src) text += ` from <strong>${src}</strong>`;
         if (dt) text += ` &amp; deposited in Bank A/c on <strong>${dt}</strong>`;
@@ -1781,14 +1784,14 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 grouped[fundName].forEach(item => {
                     sl++;
                     grandTotal += parseFloat(item.amount) || 0;
-                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td>${item.purpose}${fundReceiptNote(item)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td>${item.purpose}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
                 });
             }
             let summary = "";
             for (const fundName in grouped) {
                 const items = grouped[fundName];
                 const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-                summary += `<tr style="background:#F7F9FC;"><td colspan="4" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
+                summary += `<tr style="background:#F7F9FC;"><td colspan="4" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):${fundReceiptNoteForGroup(items)}</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
             }
             summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="4" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
             resTablesContent = `<table><colgroup><col style="width: 6%;"><col style="width: 22%;"><col style="width: 24%;"><col style="width: 32%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Fund Head / A/C No.</th><th>Payee Reference</th><th>Purpose Description</th><th class="text-right">Amount (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;
@@ -1849,14 +1852,14 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 grouped[fundName].forEach(item => {
                     sl++;
                     grandTotal += parseFloat(item.amount) || 0;
-                    rows += `<tr><td style="text-align:center;">${sl}</td><td>${item.payee}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.purpose}${fundReceiptNote(item)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td>${item.payee}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.purpose}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
                 });
             }
             let summary = "";
             for (const fundName in grouped) {
                 const items = grouped[fundName];
                 const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-                summary += `<tr style="background:#F7F9FC;"><td colspan="4" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
+                summary += `<tr style="background:#F7F9FC;"><td colspan="4" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):${fundReceiptNoteForGroup(items)}</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
             }
             summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="4" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
             hoiTablesContent = `<table><colgroup><col style="width: 6%;"><col style="width: 24%;"><col style="width: 22%;"><col style="width: 32%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Payee Head</th><th>Fund HEAD / A/C No.</th><th>Audited Purpose Block</th><th class="text-right">Total (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;
@@ -1893,14 +1896,14 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 grouped[fundName].forEach(item => {
                     sl++;
                     grandTotal += parseFloat(item.amount) || 0;
-                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span>${fundReceiptNote(item)}</td><td>${item.payee}</td><td>As noted in HOI report</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                    rows += `<tr><td style="text-align:center;">${sl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td>As noted in HOI report</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
                 });
             }
             let summary = "";
             for (const fundName in grouped) {
                 const items = grouped[fundName];
                 const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-                summary += `<tr style="background:#F7F9FC;"><td colspan="7" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
+                summary += `<tr style="background:#F7F9FC;"><td colspan="7" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):${fundReceiptNoteForGroup(items)}</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
             }
             summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="7" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
             adminTablesContent = `<table><colgroup><col style="width: 4%;"><col style="width: 16%;"><col style="width: 17%;"><col style="width: 13%;"><col style="width: 14%;"><col style="width: 10%;"><col style="width: 10%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Fund Head / A/C No.</th><th>Beneficiary</th><th>Purpose Reference</th><th>Cheque Type</th><th>Cheque No.</th><th>Issue Date</th><th class="text-right">Passed (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;

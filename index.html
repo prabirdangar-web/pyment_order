@@ -648,6 +648,14 @@
                     <input type="text" id="cregRemarks" placeholder="Optional remarks">
                 </div>
                 <div class="form-group full-width">
+                    <label for="cregReceivedFrom">Fund Received From (Source) — Optional</label>
+                    <input type="text" id="cregReceivedFrom" placeholder="e.g. West Bengal Council of Higher Secondary Education / DI Office Bankura / SSM, Bankura — leave blank if not applicable">
+                </div>
+                <div class="form-group">
+                    <label for="cregReceivedDate">Received &amp; Deposited in Bank A/c on — Optional</label>
+                    <input type="date" id="cregReceivedDate">
+                </div>
+                <div class="form-group full-width">
                     <label for="cregInWords">Amount in Words</label>
                     <input type="text" id="cregInWords" readonly placeholder="Auto-generated from Amount">
                 </div>
@@ -703,13 +711,13 @@
         </div>
         <table style="margin-top:14px;">
             <colgroup>
-                <col style="width:3%;"><col style="width:4%;"><col style="width:7%;"><col style="width:11%;"><col style="width:7%;"><col style="width:7%;"><col style="width:7%;"><col style="width:12%;"><col style="width:18%;"><col style="width:9%;"><col style="width:5%;"><col style="width:6%;">
+                <col style="width:3%;"><col style="width:4%;"><col style="width:6%;"><col style="width:10%;"><col style="width:6%;"><col style="width:6%;"><col style="width:6%;"><col style="width:11%;"><col style="width:15%;"><col style="width:8%;"><col style="width:8%;"><col style="width:8%;"><col style="width:5%;"><col style="width:5%;">
             </colgroup>
             <thead>
-                <tr><th><input type="checkbox" id="cregSelectAll" onchange="toggleAllChequeRegSelect(this.checked)" title="Select all visible rows"></th><th>Sl</th><th>DOI</th><th>A/C No.</th><th>Ch No.</th><th>Dated</th><th class="text-right">Amount (₹)</th><th>To</th><th>Purpose</th><th>Amount in Words</th><th>Remarks</th><th>Action</th></tr>
+                <tr><th><input type="checkbox" id="cregSelectAll" onchange="toggleAllChequeRegSelect(this.checked)" title="Select all visible rows"></th><th>Sl</th><th>DOI</th><th>A/C No.</th><th>Ch No.</th><th>Dated</th><th class="text-right">Amount (₹)</th><th>To</th><th>Purpose</th><th>Amount in Words</th><th>Received From</th><th>Recd./Deposit Date</th><th>Remarks</th><th>Action</th></tr>
             </thead>
             <tbody id="chequeRegBody">
-                <tr><td colspan="12" style="text-align:center;color:#7f8c8d;">Loading cheque register…</td></tr>
+                <tr><td colspan="14" style="text-align:center;color:#7f8c8d;">Loading cheque register…</td></tr>
             </tbody>
         </table>
     </div>
@@ -2381,6 +2389,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         document.getElementById("cregTo").value = entry.to || "";
         document.getElementById("cregPurpose").value = entry.purpose || "";
         document.getElementById("cregRemarks").value = entry.remarks || "";
+        document.getElementById("cregReceivedFrom").value = entry.receivedFrom || "";
+        document.getElementById("cregReceivedDate").value = entry.receivedDate || "";
         document.getElementById("cregInWords").value = entry.inWords || numToWords(entry.amount);
 
         const accSelect = document.getElementById("cregAcc");
@@ -2437,6 +2447,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 to: document.getElementById("cregTo").value.trim(),
                 purpose: document.getElementById("cregPurpose").value.trim(),
                 remarks: document.getElementById("cregRemarks").value.trim(),
+                receivedFrom: document.getElementById("cregReceivedFrom").value.trim(),
+                receivedDate: document.getElementById("cregReceivedDate").value,
                 inWords: numToWords(amt),
                 updatedAt: new Date().toISOString(),
                 updatedBy: currentUser.email
@@ -2462,6 +2474,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             to: document.getElementById("cregTo").value.trim(),
             purpose: document.getElementById("cregPurpose").value.trim(),
             remarks: document.getElementById("cregRemarks").value.trim(),
+            receivedFrom: document.getElementById("cregReceivedFrom").value.trim(),
+            receivedDate: document.getElementById("cregReceivedDate").value,
             inWords: numToWords(amt),
             createdAt: new Date().toISOString(),
             createdBy: currentUser.email
@@ -2512,6 +2526,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 to: payment.payee || "",
                 purpose: payment.purpose || "",
                 remarks: "Auto fetched from Payment Register",
+                receivedFrom: payment.receivedFrom || "",
+                receivedDate: payment.receivedDate || "",
                 inWords: numToWords(payment.amount || 0),
                 sourcePaymentId: payment.id || "",
                 createdAt: new Date().toISOString(),
@@ -2569,7 +2585,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         if (slField) slField.value = nextChequeRegSl();
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: #7f8c8d;">No cheque register entries found. Use "Import Legacy Cheque Register" above or add a new entry.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="14" style="text-align: center; color: #7f8c8d;">No cheque register entries found. Use "Import Legacy Cheque Register" above or add a new entry.</td></tr>`;
             const totalEl = document.getElementById("chequeRegTotal");
             if (totalEl) totalEl.textContent = "";
             updateChequeRegSelectionCount();
@@ -2591,6 +2607,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 <td>${entry.to}</td>
                 <td>${entry.purpose}</td>
                 <td>${entry.inWords || numToWords(entry.amount)}</td>
+                <td>${entry.receivedFrom || '<span style="color:#B0B8C1;">—</span>'}</td>
+                <td>${entry.receivedDate ? formatDate(entry.receivedDate) : '<span style="color:#B0B8C1;">—</span>'}</td>
                 <td>${entry.remarks || ''}</td>
                 <td style="text-align:center;white-space:nowrap;">
                     <button type="button" class="btn-small" ${currentUser ? '' : 'disabled'} onclick="editChequeRegisterEntry('${entry.id}')">Edit</button>
@@ -2684,7 +2702,9 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             chqType: String(r.chqType || r.chequeType || 'A/C Payee Only').trim(),
             chqNo: String(r.chNo || r.chequeNo || '').trim(),
             date: r.dated || r.doi || r.date || todayISO(),
-            amount: Number(r.amount || 0)
+            amount: Number(r.amount || 0),
+            receivedFrom: r.receivedFrom || '',
+            receivedDate: r.receivedDate || ''
         };
     }
 

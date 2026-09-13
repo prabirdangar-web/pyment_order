@@ -648,14 +648,6 @@
                     <input type="text" id="cregRemarks" placeholder="Optional remarks">
                 </div>
                 <div class="form-group full-width">
-                    <label for="cregReceivedFrom">Fund Received From (Source) — Optional</label>
-                    <input type="text" id="cregReceivedFrom" placeholder="e.g. West Bengal Council of Higher Secondary Education / DI Office Bankura / SSM, Bankura — leave blank if not applicable">
-                </div>
-                <div class="form-group">
-                    <label for="cregReceivedDate">Received &amp; Deposited in Bank A/c on — Optional</label>
-                    <input type="date" id="cregReceivedDate">
-                </div>
-                <div class="form-group full-width">
                     <label for="cregInWords">Amount in Words</label>
                     <input type="text" id="cregInWords" readonly placeholder="Auto-generated from Amount">
                 </div>
@@ -711,13 +703,13 @@
         </div>
         <table style="margin-top:14px;">
             <colgroup>
-                <col style="width:3%;"><col style="width:4%;"><col style="width:6%;"><col style="width:10%;"><col style="width:6%;"><col style="width:6%;"><col style="width:6%;"><col style="width:11%;"><col style="width:15%;"><col style="width:8%;"><col style="width:8%;"><col style="width:8%;"><col style="width:5%;"><col style="width:5%;">
+                <col style="width:3%;"><col style="width:4%;"><col style="width:7%;"><col style="width:11%;"><col style="width:7%;"><col style="width:7%;"><col style="width:7%;"><col style="width:12%;"><col style="width:18%;"><col style="width:9%;"><col style="width:5%;"><col style="width:6%;">
             </colgroup>
             <thead>
-                <tr><th><input type="checkbox" id="cregSelectAll" onchange="toggleAllChequeRegSelect(this.checked)" title="Select all visible rows"></th><th>Sl</th><th>DOI</th><th>A/C No.</th><th>Ch No.</th><th>Dated</th><th class="text-right">Amount (₹)</th><th>To</th><th>Purpose</th><th>Amount in Words</th><th>Received From</th><th>Recd./Deposit Date</th><th>Remarks</th><th>Action</th></tr>
+                <tr><th><input type="checkbox" id="cregSelectAll" onchange="toggleAllChequeRegSelect(this.checked)" title="Select all visible rows"></th><th>Sl</th><th>DOI</th><th>A/C No.</th><th>Ch No.</th><th>Dated</th><th class="text-right">Amount (₹)</th><th>To</th><th>Purpose</th><th>Amount in Words</th><th>Remarks</th><th>Action</th></tr>
             </thead>
             <tbody id="chequeRegBody">
-                <tr><td colspan="14" style="text-align:center;color:#7f8c8d;">Loading cheque register…</td></tr>
+                <tr><td colspan="12" style="text-align:center;color:#7f8c8d;">Loading cheque register…</td></tr>
             </tbody>
         </table>
     </div>
@@ -2389,8 +2381,6 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         document.getElementById("cregTo").value = entry.to || "";
         document.getElementById("cregPurpose").value = entry.purpose || "";
         document.getElementById("cregRemarks").value = entry.remarks || "";
-        document.getElementById("cregReceivedFrom").value = entry.receivedFrom || "";
-        document.getElementById("cregReceivedDate").value = entry.receivedDate || "";
         document.getElementById("cregInWords").value = entry.inWords || numToWords(entry.amount);
 
         const accSelect = document.getElementById("cregAcc");
@@ -2447,8 +2437,6 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 to: document.getElementById("cregTo").value.trim(),
                 purpose: document.getElementById("cregPurpose").value.trim(),
                 remarks: document.getElementById("cregRemarks").value.trim(),
-                receivedFrom: document.getElementById("cregReceivedFrom").value.trim(),
-                receivedDate: document.getElementById("cregReceivedDate").value,
                 inWords: numToWords(amt),
                 updatedAt: new Date().toISOString(),
                 updatedBy: currentUser.email
@@ -2474,8 +2462,6 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             to: document.getElementById("cregTo").value.trim(),
             purpose: document.getElementById("cregPurpose").value.trim(),
             remarks: document.getElementById("cregRemarks").value.trim(),
-            receivedFrom: document.getElementById("cregReceivedFrom").value.trim(),
-            receivedDate: document.getElementById("cregReceivedDate").value,
             inWords: numToWords(amt),
             createdAt: new Date().toISOString(),
             createdBy: currentUser.email
@@ -2526,8 +2512,6 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 to: payment.payee || "",
                 purpose: payment.purpose || "",
                 remarks: "Auto fetched from Payment Register",
-                receivedFrom: payment.receivedFrom || "",
-                receivedDate: payment.receivedDate || "",
                 inWords: numToWords(payment.amount || 0),
                 sourcePaymentId: payment.id || "",
                 createdAt: new Date().toISOString(),
@@ -2585,7 +2569,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         if (slField) slField.value = nextChequeRegSl();
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="14" style="text-align: center; color: #7f8c8d;">No cheque register entries found. Use "Import Legacy Cheque Register" above or add a new entry.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: #7f8c8d;">No cheque register entries found. Use "Import Legacy Cheque Register" above or add a new entry.</td></tr>`;
             const totalEl = document.getElementById("chequeRegTotal");
             if (totalEl) totalEl.textContent = "";
             updateChequeRegSelectionCount();
@@ -2607,8 +2591,6 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 <td>${entry.to}</td>
                 <td>${entry.purpose}</td>
                 <td>${entry.inWords || numToWords(entry.amount)}</td>
-                <td>${entry.receivedFrom || '<span style="color:#B0B8C1;">—</span>'}</td>
-                <td>${entry.receivedDate ? formatDate(entry.receivedDate) : '<span style="color:#B0B8C1;">—</span>'}</td>
                 <td>${entry.remarks || ''}</td>
                 <td style="text-align:center;white-space:nowrap;">
                     <button type="button" class="btn-small" ${currentUser ? '' : 'disabled'} onclick="editChequeRegisterEntry('${entry.id}')">Edit</button>
@@ -2686,12 +2668,18 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     // exact same data shape used by the Step-3 NEW document suite.  Therefore the
     // old register can never fall back to a different notice/resolution/HOI/order/
     // pay-slip design.
-    function chequeRowToNewTemplateEntry(r) {
-        const account = String(r.acc || r.account || '').trim();
+    function extractFundNameFromAccountString(acc) {
+        const account = String(acc || '').trim();
         let fund = account;
         const m = account.match(/\(([^)]+)\)|\[([^\]]+)\]/);
         if (m) fund = (m[1] || m[2] || account).replace(/\bFUND\b/i, '').trim();
         if (!fund) fund = 'GENERAL';
+        return fund;
+    }
+
+    function chequeRowToNewTemplateEntry(r) {
+        const account = String(r.acc || r.account || '').trim();
+        const fund = extractFundNameFromAccountString(account);
 
         return {
             id: r.id,
@@ -2703,8 +2691,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             chqNo: String(r.chNo || r.chequeNo || '').trim(),
             date: r.dated || r.doi || r.date || todayISO(),
             amount: Number(r.amount || 0),
-            receivedFrom: r.receivedFrom || '',
-            receivedDate: r.receivedDate || ''
+            receivedFrom: '',
+            receivedDate: ''
         };
     }
 
@@ -2721,6 +2709,60 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         }
     }
 
+    // One-time, fund-wise "Received From" popup shown right when generating —
+    // NOT stored on the Cheque Register (which stays exactly as before). Only
+    // asks for the source text, once per distinct fund head in the selection;
+    // no date or amount is asked since those are already known/computed.
+    function promptFundReceivedFrom(rows, onDone) {
+        const funds = [];
+        rows.forEach(r => {
+            const fund = extractFundNameFromAccountString(r.acc || r.account);
+            if (!funds.includes(fund)) funds.push(fund);
+        });
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(11,37,69,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;';
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:8px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,0.3);';
+
+        const fieldsHtml = funds.map((fund, i) => `
+            <div style="margin-bottom:14px;">
+                <label style="font-size:13px;font-weight:600;color:#134074;display:block;margin-bottom:6px;">${fund}</label>
+                <input type="text" id="fundRecvInput_${i}" placeholder="e.g. West Bengal Council of Higher Secondary Education / DI Office Bankura — leave blank to skip" style="width:100%;padding:9px 10px;font-size:14px;border:1px solid #CBD5E1;border-radius:4px;box-sizing:border-box;">
+            </div>
+        `).join('');
+
+        box.innerHTML = `
+            <div style="font-size:16px;font-weight:700;color:#0B2545;margin-bottom:6px;">Fund Received From (one-time, this document only)</div>
+            <div style="font-size:12px;color:#64748B;margin-bottom:16px;">Enter the source only, one line per fund head in this selection. Optional — leave blank to skip. Not saved to the Cheque Register; used only for the document being generated now.</div>
+            ${fieldsHtml}
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
+                <button type="button" id="fundRecvSkipBtn" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;border-radius:4px;cursor:pointer;background:#E2E8F0;color:#475569;">Skip</button>
+                <button type="button" id="fundRecvGoBtn" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;border-radius:4px;cursor:pointer;background:#134074;color:#fff;">Continue &amp; Generate</button>
+            </div>
+        `;
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        function finish(map) {
+            document.body.removeChild(overlay);
+            onDone(map || {});
+        }
+
+        box.querySelector('#fundRecvSkipBtn').addEventListener('click', () => finish({}));
+        box.querySelector('#fundRecvGoBtn').addEventListener('click', () => {
+            const map = {};
+            funds.forEach((fund, i) => {
+                const val = document.getElementById(`fundRecvInput_${i}`).value.trim();
+                if (val) map[fund] = val;
+            });
+            finish(map);
+        });
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) finish({}); });
+    }
+
     function generateSelectedChequeRegDocument(type) {
         const rows = chequeRegisterEntries
             .filter(e => selectedChequeRegIds.has(e.id))
@@ -2733,6 +2775,22 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
 
         if (type === 'payslips') {
             withSelectedChequeRowsAsNewTemplate(rows, () => generateExactSelectedPaySlips(rows));
+            return;
+        }
+
+        // Only these document types print the fund-wise "Fund received
+        // from..." note, so only these ask for it -- once per fund head
+        // involved in the selection, never per individual entry.
+        const fundNoteTypes = ['notice', 'resolution', 'hoi', 'admin', 'combined'];
+        if (fundNoteTypes.includes(type)) {
+            promptFundReceivedFrom(rows, (fundReceivedMap) => {
+                withSelectedChequeRowsAsNewTemplate(rows, (templateEntries) => {
+                    templateEntries.forEach(en => {
+                        if (fundReceivedMap[en.fund]) en.receivedFrom = fundReceivedMap[en.fund];
+                    });
+                    generateExactSelectedSuitePage(type, rows);
+                });
+            });
             return;
         }
 

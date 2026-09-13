@@ -486,8 +486,9 @@
                 <button type="button" class="btn" style="background-color:#8E44AD;color:#fff;" onclick="generateSSMDebitVoucher()">🧾 Generate SSM Debit Voucher</button>
                 <button type="button" class="btn" style="background-color:#16A085;color:#fff;" onclick="generateVocationalTransferLetter()">🏦 Generate Vocational Transfer Letter</button>
                 <button type="button" class="btn" style="background-color:#D35400;color:#fff;" onclick="generateMDMTransferLetter()">🍽️ Generate MDM Transfer Letter</button>
+                <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none;background-color:#B91C1C;color:#fff;" onclick="cancelEditEntry()">✖ Cancel Edit</button>
                 <button type="button" class="btn btn-secondary" onclick="clearForm()">Reset Entry Fields</button>
-                <button type="submit" class="btn btn-primary">Save Entry to Batch Head</button>
+                <button type="submit" class="btn btn-primary" id="saveEntryBtn">Save Entry to Batch Head</button>
             </div>
         </form>
     </div>
@@ -747,6 +748,7 @@
     };
 
     let sessionEntries = [];
+    let editingEntryId = null; // when set, Save Entry updates this entry instead of appending a new one
 
     function todayISO() {
         const d = new Date();
@@ -1558,8 +1560,18 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         const chqVal = document.getElementById("chqType").value;
         const finalChqType = chqVal === "MANUAL" ? document.getElementById("manualChqTypeInput").value : chqVal;
 
+        // If we are editing an existing entry, keep its original id/createdAt
+        // so we UPDATE that row in place instead of creating a brand-new one.
+        const isEditing = !!editingEntryId;
+        const original = isEditing ? sessionEntries.find(en => en.id === editingEntryId) : null;
+        if (isEditing && !original) {
+            alert("The entry being edited could no longer be found (it may have been deleted by someone else). Cancelling edit.");
+            cancelEditEntry();
+            return;
+        }
+
         const entry = {
-            id: 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+            id: isEditing ? original.id : ('e_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
             fund: finalFund,
             account: document.getElementById("bankAcc").value,
             bank: document.getElementById("bankName").value,
@@ -1571,23 +1583,116 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             purpose: finalPurpose,
             receivedFrom: document.getElementById("receivedFromInput").value.trim(),
             receivedDate: document.getElementById("receivedDateInput").value,
-            createdAt: new Date().toISOString(),
-            createdBy: currentUser.email
+            createdAt: isEditing ? original.createdAt : new Date().toISOString(),
+            createdBy: isEditing ? original.createdBy : currentUser.email
         };
+        // Only attach edit-tracking fields when this save is actually an edit,
+        // so we never write `undefined` into Firestore (which throws).
+        if (isEditing) {
+            entry.editedAt = new Date().toISOString();
+            entry.editedBy = currentUser.email;
+        } else if (original && original.editedAt) {
+            entry.editedAt = original.editedAt;
+            entry.editedBy = original.editedBy;
+        }
 
-        const updatedEntries = [...sessionEntries, entry];
+        // REPLACE the matching entry in place when editing; APPEND only when
+        // this is a genuinely new entry. This is what prevents duplicate rows
+        // (and therefore duplicate lines in the generated document suite)
+        // whenever an existing entry is corrected and re-saved.
+        const updatedEntries = isEditing
+            ? sessionEntries.map(en => en.id === editingEntryId ? entry : en)
+            : [...sessionEntries, entry];
 
         ledgerDocRef.set({
             entries: updatedEntries,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true })
             .then(() => {
+                editingEntryId = null;
                 clearForm();
                 autoFetchPaymentsToChequeRegister(true);
             })
             .catch(err => {
                 alert("Could not save entry to cloud database: " + err.message);
             });
+    }
+
+    // Populates the Step 1 form with an existing entry's data and switches
+    // Save into "update this entry" mode, so re-saving replaces the original
+    // row instead of adding a duplicate.
+    function editEntry(entryId) {
+        if (!currentUser) {
+            alert("Please sign in with the admin account before editing entries.");
+            return;
+        }
+        const entry = sessionEntries.find(en => en.id === entryId);
+        if (!entry) {
+            alert("Could not find that entry — it may have already been deleted.");
+            return;
+        }
+
+        editingEntryId = entryId;
+
+        const knownFunds = ["MDM", "VOCATIONAL", "SSM", "GENERAL", "DEVELOPMENT", "HOSTEL"];
+        const fundSelect = document.getElementById("fundSelect");
+        if (knownFunds.includes(entry.fund)) {
+            fundSelect.value = entry.fund;
+        } else {
+            fundSelect.value = "MANUAL";
+        }
+        updateAccountDetails();
+        if (fundSelect.value === "MANUAL") {
+            document.getElementById("manualFundInput").value = entry.fund;
+        }
+        // Account/bank fields may have been edited manually even for a known
+        // fund head, so always restore the values actually stored on entry.
+        document.getElementById("bankAcc").value = entry.account;
+        document.getElementById("bankName").value = entry.bank;
+
+        const knownPayees = ["Sital Chhaya Mahila SGSY", "Subhadip Chakraborty", "Tribhanga Khan", "Kishor Ghosh",
+            "Friends Offset Printing", "Soumen Nandi", "Ramprasad Layek", "Through Bank Transfer", "To Various Payees through HM"];
+        const payeeSelect = document.getElementById("payeeSelect");
+        if (knownPayees.includes(entry.payee)) {
+            payeeSelect.value = entry.payee;
+        } else {
+            payeeSelect.value = "MANUAL";
+        }
+        togglePayeeInput();
+        if (payeeSelect.value === "MANUAL") {
+            document.getElementById("manualPayeeInput").value = entry.payee;
+        }
+
+        const knownChqTypes = ["A/C Payee Only", "Bearer", " "];
+        const chqTypeSelect = document.getElementById("chqType");
+        if (knownChqTypes.includes(entry.chqType)) {
+            chqTypeSelect.value = entry.chqType;
+        } else {
+            chqTypeSelect.value = "MANUAL";
+        }
+        toggleChqTypeInput();
+        if (chqTypeSelect.value === "MANUAL") {
+            document.getElementById("manualChqTypeInput").value = entry.chqType;
+        }
+
+        document.getElementById("chqNo").value = entry.chqNo || "";
+        document.getElementById("chqDate").value = entry.date || "";
+        document.getElementById("expAmount").value = entry.amount || "";
+        document.getElementById("purposeInput").value = entry.purpose || "";
+        document.getElementById("receivedFromInput").value = entry.receivedFrom || "";
+        document.getElementById("receivedDateInput").value = entry.receivedDate || "";
+
+        const saveBtn = document.getElementById("saveEntryBtn");
+        saveBtn.textContent = "Update Entry (editing existing record)";
+        saveBtn.style.backgroundColor = "#B45309";
+        document.getElementById("cancelEditBtn").style.display = "";
+
+        document.getElementById("ledgerForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function cancelEditEntry() {
+        editingEntryId = null;
+        clearForm();
     }
 
     function deleteEntry(entryId) {
@@ -1624,7 +1729,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 <td class="text-right">₹${entry.amount}</td>
                 <td>${entry.receivedFrom || '<span style="color:#B0B8C1;">—</span>'}</td>
                 <td>${entry.receivedDate ? formatDate(entry.receivedDate) : '<span style="color:#B0B8C1;">—</span>'}</td>
-                <td style="text-align:center;">
+                <td style="text-align:center; white-space:nowrap;">
+                    <button type="button" class="btn-danger-row" style="background:#2980B9;margin-right:4px;" ${currentUser ? '' : 'disabled'} onclick="editEntry('${entry.id}')">Edit</button>
                     <button type="button" class="btn-danger-row" ${currentUser ? '' : 'disabled'} onclick="deleteEntry('${entry.id}')">Delete</button>
                 </td>
             </tr>
@@ -2062,6 +2168,16 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         document.getElementById("bankName").readOnly = true;
         document.getElementById("bankAcc").placeholder = "Auto-filled";
         document.getElementById("bankName").placeholder = "Auto-filled";
+
+        // Always leave the form back in "add a new entry" mode.
+        editingEntryId = null;
+        const saveBtn = document.getElementById("saveEntryBtn");
+        if (saveBtn) {
+            saveBtn.textContent = "Save Entry to Batch Head";
+            saveBtn.style.backgroundColor = "";
+        }
+        const cancelBtn = document.getElementById("cancelEditBtn");
+        if (cancelBtn) cancelBtn.style.display = "none";
     }
 </script>
 

@@ -2278,6 +2278,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     let deletePasswordCache = null;
     let chequeRegisterEntries = [];
     let chequeRegSeeded = false;
+    let chequeRegLoaded = false;                 // true once the first cloud snapshot has arrived
+    let chequeRegSuppressedPaymentIds = new Set(); // payments already fetched once (even if later deleted) - never fetched again
     let selectedChequeRegIds = new Set();
 
     // Historical Cheque Issue Register imported from the Excel workbook
@@ -2291,6 +2293,10 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 ? data.entries.map(e => ({ ...e, inWords: e.inWords || numToWords(e.amount) }))
                 : [];
             chequeRegSeeded = !!(data && data.seeded);
+            chequeRegLoaded = true;
+            chequeRegSuppressedPaymentIds = new Set(
+                (data && Array.isArray(data.fetchSuppressedPaymentIds)) ? data.fetchSuppressedPaymentIds.map(String) : []
+            );
 
             // Load the shared delete password from Firebase so it is identical
             // on every signed-in computer/browser.
@@ -2562,9 +2568,44 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         .catch(err => alert("Could not save register entry: " + err.message));
     }
 
+    // ---------- Auto-fetch helpers (duplicate protection) ----------
+    function chequeKeyNorm(v) {
+        return String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
+    // Payment Register id that a cheque-register row was created from ('' for manual/legacy rows).
+    function chequeRegSourcePaymentId(entry) {
+        if (entry && entry.sourcePaymentId) return String(entry.sourcePaymentId);
+        const id = String((entry && entry.id) || '');
+        return id.startsWith('payment_creg_') ? id.slice('payment_creg_'.length) : '';
+    }
+
+    // True when this payment cheque is already in the Cheque Issue Register
+    // (fetched earlier, or entered manually / imported as legacy).
+    function paymentAlreadyInChequeRegister(payment, chNo, account) {
+        const pid = payment.id ? String(payment.id) : '';
+        const acct = chequeKeyNorm(account);
+        const amt = Number(payment.amount || 0).toFixed(2);
+        return chequeRegisterEntries.some(e => {
+            if (pid && chequeRegSourcePaymentId(e) === pid) return true;
+            if (chequeKeyNorm(e.chNo) !== chequeKeyNorm(chNo)) return false;
+            // Same cheque no. -> treat as the same cheque if the account matches
+            // (register stores "ACCOUNT (FUND)" for fetched rows) or the amount matches.
+            const eAcc = chequeKeyNorm(e.acc);
+            const accMatch = acct && eAcc && (eAcc.includes(acct) || acct.includes(eAcc));
+            return accMatch || Number(e.amount || 0).toFixed(2) === amt;
+        });
+    }
+
     function autoFetchPaymentsToChequeRegister(silent = false) {
         if (!currentUser) {
             if (!silent) alert("Please sign in with the admin account before fetching payment records.");
+            return;
+        }
+        // Never write before the cloud register has loaded - otherwise an empty local
+        // copy could overwrite the real register.
+        if (!chequeRegLoaded) {
+            if (!silent) alert("Cheque Issue Register is still loading. Please try again in a moment.");
             return;
         }
 
@@ -2574,18 +2615,20 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             return;
         }
 
-        const existingKeys = new Set(
-            chequeRegisterEntries.map(e => `${String(e.chNo || '').trim()}|${String(e.acc || '').trim()}`)
-        );
-
         const newRows = [];
+        const batchKeys = new Set();
         paymentRows.forEach(payment => {
             const chNo = String(payment.chqNo || "").trim();
             const account = String(payment.account || "").trim();
             if (!chNo || !account) return;
 
-            const key = `${chNo}|${account}`;
-            if (existingKeys.has(key)) return;
+            const pid = payment.id ? String(payment.id) : '';
+            if (pid && chequeRegSuppressedPaymentIds.has(pid)) return;   // fetched before, then deleted -> stay deleted
+            if (paymentAlreadyInChequeRegister(payment, chNo, account)) return; // already exists
+
+            const batchKey = `${chequeKeyNorm(chNo)}|${chequeKeyNorm(account)}`;
+            if (batchKeys.has(batchKey)) return;
+            batchKeys.add(batchKey);
 
             newRows.push({
                 id: 'payment_creg_' + String(payment.id || (Date.now() + '_' + Math.random().toString(36).slice(2, 8))),
@@ -2603,11 +2646,10 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 createdAt: new Date().toISOString(),
                 createdBy: "payment register auto-fetch"
             });
-            existingKeys.add(key);
         });
 
         if (!newRows.length) {
-            if (!silent) alert("All Payment Register cheque entries are already present in the Cheque Issue Register.");
+            if (!silent) alert("Nothing new to fetch. All Payment Register cheques are already in the Cheque Issue Register (or were fetched earlier and then deleted).");
             return;
         }
 
@@ -2633,15 +2675,39 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             alert("Please sign in with the admin account before deleting register entries.");
             return;
         }
+        const target = chequeRegisterEntries.find(entry => entry.id === id);
+        if (!target) return;
         if (!verifyDeletePassword()) return;
-        if (!confirm("Delete this selected cheque register entry permanently? This cannot be undone.")) return;
+        if (!confirm("Delete this selected cheque register entry permanently? This cannot be undone.\n\nSl. numbers of the rows below it will be adjusted automatically.")) return;
 
-        const updated = chequeRegisterEntries.filter(entry => entry.id !== id);
-        selectedChequeRegIds.delete(id);
-        chequeRegDocRef.set({
+        // Sl. numbers of the removed row(s)
+        const removedSls = chequeRegisterEntries
+            .filter(entry => entry.id === id)
+            .map(entry => Number(entry.sl) || 0)
+            .filter(n => n > 0);
+
+        // Close the gap: every remaining row moves up by the number of removed rows above it.
+        const updated = chequeRegisterEntries
+            .filter(entry => entry.id !== id)
+            .map(entry => {
+                const sl = Number(entry.sl) || 0;
+                if (!sl) return entry;
+                const shift = removedSls.filter(r => r < sl).length;
+                return shift ? { ...entry, sl: sl - shift } : entry;
+            });
+
+        const payload = {
             entries: updated,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true })
+        };
+        // Remember that this payment was already fetched, so auto-fetch never brings it back.
+        const sourcePid = chequeRegSourcePaymentId(target);
+        if (sourcePid) {
+            payload.fetchSuppressedPaymentIds = firebase.firestore.FieldValue.arrayUnion(sourcePid);
+        }
+
+        selectedChequeRegIds.delete(id);
+        chequeRegDocRef.set(payload, { merge: true })
             .catch(err => alert("Could not delete entry: " + err.message));
     }
 

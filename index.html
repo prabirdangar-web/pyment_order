@@ -1386,13 +1386,18 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     // start from an auto-generated value, and the Total + amount-in-words recompute
     // live as amounts are edited.
     function buildTransferLetterHTML(cfg) {
+        const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
         const rowsHtml = cfg.rows.map((r, i) => `
                 <tr>
                     <td style="text-align:center;">${i + 1}</td>
-                    <td><input type="text" class="rowName" value="${(r.name || '').replace(/"/g, '&quot;')}"></td>
-                    <td><input type="text" class="rowAcc" value="${(r.acc || '').replace(/"/g, '&quot;')}"></td>
-                    <td><input type="number" class="rowAmt" value="${r.amount}" oninput="recalcLetterTotal()" style="text-align:right;"></td>
-                    <td><input type="text" class="rowRemarks" value=""></td>
+                    <td><div class="fitcell rowName" data-lines="2" data-size="14" contenteditable="true" spellcheck="false">${esc(r.name)}</div></td>
+                    <td><div class="fitcell rowAcc" data-lines="1" data-size="14" contenteditable="true" spellcheck="false">${esc(r.acc)}</div></td>
+                    <td class="amtCell">
+                        <input type="number" step="any" min="0" class="rowAmt screen-only" value="${esc(r.amount)}" oninput="recalcLetterTotal()" placeholder="Amount">
+                        <div class="amtFig"></div>
+                        <div class="amtWords"></div>
+                    </td>
+                    <td><div class="fitcell rowRemarks" data-lines="2" data-size="13" contenteditable="true" spellcheck="false"></div></td>
                 </tr>`).join('');
 
         return `<!DOCTYPE html>
@@ -1423,11 +1428,22 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     .addr-block .to { font-weight:bold; }
     .sir { font-weight:bold; font-size:16px; margin: 10px 0; }
     .intro { font-size:15px; line-height:1.6; margin-bottom: 18px; text-align: justify; }
-    table.paytable { width:100%; border-collapse:collapse; margin-bottom: 4px; }
-    table.paytable th, table.paytable td { border:1px solid #000; padding:6px 8px; font-size:14px; }
+    table.paytable { width:100%; border-collapse:collapse; margin-bottom: 4px; table-layout:fixed; }
+    table.paytable th, table.paytable td { border:1px solid #000; padding:5px 6px; font-size:14px; vertical-align:middle; }
     table.paytable th { background:#f0f0f0; text-align:center; }
-    table.paytable td input { width:100%; border:none; background:transparent; font-family:inherit; font-size:14px; }
-    table.paytable td:first-child, table.paytable th:first-child { width: 6%; }
+    table.paytable th:nth-child(1) { width: 6%; }
+    table.paytable th:nth-child(2) { width: 27%; }
+    table.paytable th:nth-child(3) { width: 18%; }
+    table.paytable th:nth-child(4) { width: 31%; }
+    table.paytable th:nth-child(5) { width: 18%; }
+    /* editable cells: wrap (max 2 lines) and shrink the font to fit instead of clipping */
+    .fitcell { min-height: 1.25em; line-height: 1.25; outline:none; word-break: break-word; overflow-wrap:anywhere; }
+    .fitcell[data-lines="1"] { white-space: nowrap; overflow-wrap:normal; word-break:normal; }
+    .fitcell:focus { background:#fffbe6; }
+    .amtCell { text-align:right; }
+    .amtCell input.rowAmt { width:100%; border:1px solid #bbb; background:#fffbe6; font-family:inherit; font-size:13px; text-align:right; padding:2px 4px; margin-bottom:3px; }
+    .amtFig { font-weight:bold; font-size:14px; }
+    .amtWords { font-size:11px; line-height:1.25; font-style:italic; overflow-wrap:anywhere; }
     .total-row td { font-weight:bold; text-align:right; }
     .words-box { border:2px solid #0B2545; text-align:center; font-weight:bold; padding:8px; margin: 10px 0 16px 0; color:#0B2545; }
     .closing { font-size:15px; line-height:1.8; }
@@ -1437,11 +1453,15 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     .footer-line .chqDateInput { width:150px; }
     .no-print { position:fixed; top:16px; right:16px; z-index:999; }
     .print-btn { background:#111; color:#fff; border:2px solid #fff; padding:10px 24px; font-size:14px; font-weight:bold; border-radius:4px; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.3); }
+    @page { size: A4; margin: 0; }
     @media print {
-        body { background:none; padding:0; }
-        .page { border:none; width:auto; min-height:auto; margin:0; padding:14mm; }
-        .no-print { display:none !important; }
-        table.paytable td input, .memo-row input, .footer-line input { border:none !important; }
+        body { background:none; padding:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .page { border:none; width:210mm; min-height:auto; margin:0; padding:14mm; }
+        .no-print, .screen-only { display:none !important; }
+        table.paytable tr { page-break-inside: avoid; }
+        .fitcell:focus { background:none; }
+        .memo-row input, .footer-line input { border:none !important; }
+        input[type=date]::-webkit-calendar-picker-indicator { display:none; }
     }
 </style>
 </head>
@@ -1507,6 +1527,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     document.getElementById('printBtn').addEventListener('click', function () { window.print(); });
 
     function numberToWordsLetter(num) {
+        num = Math.floor(num);
         if (num === 0) return 'Zero';
         const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
         const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -1519,23 +1540,88 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             return str.trim();
         }
         let word = '';
+        let crores = Math.floor(num / 10000000); num %= 10000000;
         let lakhs = Math.floor(num / 100000); num %= 100000;
         let thousands = Math.floor(num / 1000); num %= 1000;
+        if (crores > 0) word += under1000(crores) + ' Crore ';
         if (lakhs > 0) word += under1000(lakhs) + ' Lakh ';
         if (thousands > 0) word += under1000(thousands) + ' Thousand ';
         if (num > 0) word += under1000(num);
         return word.trim();
     }
 
-    function recalcLetterTotal() {
-        const amtInputs = document.querySelectorAll('.rowAmt');
-        let total = 0;
-        amtInputs.forEach(inp => { total += parseFloat(inp.value) || 0; });
-        document.getElementById('letterTotalCell').innerText = total.toLocaleString('en-IN');
-        document.getElementById('letterWordsBox').innerText = '[ Rupees ' + numberToWordsLetter(total) + ' Only ]';
+    // "Rupees Five Thousand Only" (with paise when the amount has decimals)
+    function amountToWordsFull(amount) {
+        const paiseTotal = Math.round((parseFloat(amount) || 0) * 100);
+        const rupees = Math.floor(paiseTotal / 100);
+        const paise = paiseTotal % 100;
+        let w = 'Rupees ' + numberToWordsLetter(rupees);
+        if (paise > 0) w += ' and ' + numberToWordsLetter(paise) + ' Paise';
+        return w + ' Only';
     }
 
+    function formatINR(amount) {
+        const v = Math.round((parseFloat(amount) || 0) * 100) / 100;
+        return v.toLocaleString('en-IN', { minimumFractionDigits: (v % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 });
+    }
+
+    // Shrink the font until the text fits in data-lines lines (names wrap to 2 lines first).
+    function fitCell(el) {
+        const maxLines = parseInt(el.getAttribute('data-lines'), 10) || 1;
+        let size = parseFloat(el.getAttribute('data-size')) || 14;
+        const minSize = 8;
+        el.style.fontSize = size + 'px';
+        function overflows() {
+            if (maxLines === 1) return el.scrollWidth > el.clientWidth + 1;
+            return el.scrollHeight > (size * 1.25 * maxLines) + 1;
+        }
+        while (size > minSize && overflows()) {
+            size -= 0.5;
+            el.style.fontSize = size + 'px';
+        }
+    }
+
+    function fitAllCells() {
+        document.querySelectorAll('.fitcell').forEach(fitCell);
+    }
+
+    function recalcLetterTotal() {
+        let total = 0;
+        document.querySelectorAll('#letterRowsBody tr').forEach(tr => {
+            const inp = tr.querySelector('.rowAmt');
+            if (!inp) return;
+            const amt = parseFloat(inp.value) || 0;
+            total += amt;
+            const fig = tr.querySelector('.amtFig');
+            const words = tr.querySelector('.amtWords');
+            if (amt > 0) {
+                fig.innerText = formatINR(amt) + '/-';
+                words.innerText = '(' + amountToWordsFull(amt) + ')';
+            } else {
+                fig.innerText = '';
+                words.innerText = '';
+            }
+        });
+        total = Math.round(total * 100) / 100;
+        document.getElementById('letterTotalCell').innerText = formatINR(total) + '/-';
+        document.getElementById('letterWordsBox').innerText = '[ ' + amountToWordsFull(total) + ' ]';
+    }
+
+    document.querySelectorAll('.fitcell').forEach(el => {
+        el.addEventListener('input', function () { fitCell(el); });
+        el.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+        el.addEventListener('paste', function (e) {
+            e.preventDefault();
+            const txt = (e.clipboardData || window.clipboardData).getData('text');
+            document.execCommand('insertText', false, txt.split(String.fromCharCode(10)).join(' '));
+        });
+    });
+    window.addEventListener('beforeprint', fitAllCells);
+    window.addEventListener('resize', fitAllCells);
+
     recalcLetterTotal();
+    fitAllCells();
+    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fitAllCells); }
 <\/script>
 </body>
 </html>`;

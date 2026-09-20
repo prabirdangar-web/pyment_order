@@ -364,6 +364,8 @@
                 color: #000000 !important;
             }
         }
+        [contenteditable="true"]:hover { background: #FFFBEA; cursor: text; }
+        @media print { [contenteditable="true"]:hover { background: transparent; } }
     </style>
 </head>
 <body>
@@ -573,6 +575,7 @@
                 🎫 Generate A4 Pay Order Slips
             </button>
         </div>
+        <div id="mdmFlowNote" style="margin-top:12px;font-size:12.5px;color:#475569;background:#FFF8E6;border:1px solid #E6C77A;border-radius:4px;padding:8px 12px;"></div>
     </div>
 
     <div id="masterDocumentSuite" class="master-doc-output">
@@ -1799,6 +1802,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
     }
 
     function renderLogTable() {
+        updateMdmFlowNote();
         const tbody = document.getElementById("logTableBody");
         if (!sessionEntries.length) {
             tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #7f8c8d;">No records generated yet in this active session.</td></tr>`;
@@ -1821,6 +1825,21 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 </td>
             </tr>
         `).join('');
+    }
+
+    // MDM rule: MDM entries do NOT go through the HOI Report / Administrator Order route.
+    // The Finance Sub-Committee itself sanctions the payment and the cheque issue at its meeting.
+    // All other funds keep the normal Notice -> Resolution -> HOI Report -> Administrator Order flow.
+    function isMDMEntry(it) {
+        return /^\s*MDM\b/i.test(String((it && it.fund) || ''));
+    }
+    const MDM_FSC_NOTE = "In respect of the Mid-Day Meal (MDM) fund, the Finance Sub-Committee, after checking the bills and vouchers, resolved to sanction the expenditure and to issue the cheque(s) / make the payment directly at this meeting, as per the details below. These MDM payments are not required to be forwarded to the Head of Institution (HOI) or the Administrator for any separate report or order.";
+    function updateMdmFlowNote() {
+        const el = document.getElementById("mdmFlowNote");
+        if (!el) return;
+        const n = sessionEntries.filter(isMDMEntry).length;
+        el.innerHTML = "ℹ️ <b>MDM rule:</b> MDM entries skip the HOI Report &amp; Administrator Order — payment and cheque issue are recorded in the Finance Sub-Committee Resolution itself. All other funds follow the usual flow." +
+            (n ? ` <b style="color:#B45309;">${n} MDM entr${n === 1 ? "y" : "ies"} in this batch.</b>` : "");
     }
 
     function groupEntriesByFund() {
@@ -1904,8 +1923,16 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         const container = document.getElementById("suiteInnerContainer");
         container.innerHTML = "";
         
-        const grouped = groupEntriesByFund();
-        const fundHeadsList = Object.keys(grouped);
+        const groupedAll = groupEntriesByFund();
+        const grouped = {};      // normal funds: Resolution -> HOI Report -> Administrator Order
+        const groupedMdm = {};   // MDM: sanctioned + cheque issued by the Finance Sub-Committee itself
+        Object.keys(groupedAll).forEach(k => { (isMDMEntry({ fund: k }) ? groupedMdm : grouped)[k] = groupedAll[k]; });
+        const hasMdm = Object.keys(groupedMdm).length > 0;
+        const hasMain = Object.keys(grouped).length > 0;
+        const grandLabel = hasMdm ? "GRAND TOTAL (Funds other than MDM):" : "GRAND TOTAL (All Funds):";
+        const mdmExclNote = hasMdm ? `<p style="font-size:11px;font-style:italic;color:#0B2545;margin:6px 0 0 0;">Note: MDM fund entries are not included here — payment and cheque issue for MDM are sanctioned directly by the Finance Sub-Committee (see Resolution).</p>` : "";
+        const pageList = [];
+        const fundHeadsList = Object.keys(groupedAll);
         const fundHeadsStr = fundHeadsList.length ? fundHeadsList.join(", ") : "________";
         const resNoVal = document.getElementById("metaResNo").value || "________";
         const resDateVal = formatDate(document.getElementById("metaResDate").value);
@@ -1964,7 +1991,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             </div>
             <div class="audit-footer"><span>TFHS Fund Allocation Suite</span><span>Page 1 of 4 — Notice</span></div>
         </div>`;
-        container.innerHTML += page1;
+        pageList.push({ doc: 'notice', html: page1 });
 
         // --- PAGE 2: RESOLUTIONS ADOPTED ---
         let resTablesContent = "";
@@ -1985,8 +2012,31 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
                 summary += `<tr style="background:#F7F9FC;"><td colspan="4" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):${fundReceiptNoteForGroup(items)}</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
             }
-            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="4" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
+            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="4" style="text-align:right;">${grandLabel}</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
             resTablesContent = `<table><colgroup><col style="width: 6%;"><col style="width: 22%;"><col style="width: 24%;"><col style="width: 32%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Fund Head / A/C No.</th><th>Payee Reference</th><th>Purpose Description</th><th class="text-right">Amount (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;
+        }
+
+        let mdmResContent = "";
+        if (hasMdm) {
+            let mrows = "";
+            let msl = 0;
+            let mTotal = 0;
+            for (const fundName in groupedMdm) {
+                groupedMdm[fundName].forEach(item => {
+                    msl++;
+                    mTotal += parseFloat(item.amount) || 0;
+                    mrows += `<tr><td style="text-align:center;">${msl}</td><td><strong>${fundName}</strong><br><span style="font-size:11px;color:#555;">A/C: ${item.account}</span></td><td>${item.payee}</td><td contenteditable="true" title="Editable description">${item.purpose}</td><td><strong>${item.chqType}</strong></td><td><code>${item.chqNo}</code></td><td>${formatDate(item.date)}</td><td class="text-right"><strong>₹${item.amount}</strong></td></tr>`;
+                });
+            }
+            let msummary = "";
+            for (const fundName in groupedMdm) {
+                const items = groupedMdm[fundName];
+                const fundTotal = items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+                msummary += `<tr style="background:#F7F9FC;"><td colspan="7" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):${fundReceiptNoteForGroup(items)}</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
+            }
+            mdmResContent = `<div class="fund-group-header" style="margin-top:18px;">MDM — Payment sanctioned &amp; cheque issued by the Finance Sub-Committee</div>
+            <p class="doc-body-text" contenteditable="true" title="Editable description" style="font-size:13px;">${MDM_FSC_NOTE}</p>
+            <table><colgroup><col style="width: 5%;"><col style="width: 15%;"><col style="width: 15%;"><col style="width: 22%;"><col style="width: 10%;"><col style="width: 11%;"><col style="width: 10%;"><col style="width: 12%;"></colgroup><thead><tr><th>Sl</th><th>Fund Head / A/C No.</th><th>Payee</th><th>Purpose Description</th><th>Cheque Type</th><th>Cheque No.</th><th>Cheque Date</th><th class="text-right">Amount (₹)</th></tr></thead><tbody>${mrows}${msummary}<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="7" style="text-align:right;">TOTAL (MDM):</td><td class="text-right">₹${mTotal.toFixed(2)}</td></tr></tbody></table>`;
         }
 
         let page2 = `<div class="a4-page">
@@ -2023,7 +2073,8 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             </div>
 
             <p class="doc-body-text">The meeting started under the Chairmanship of Sri Prabir Kumar Dangar, Headmaster. At the onset of the meeting, the chairperson welcomed all present respected persons. All the bills and vouchers placed by the HM regarding payments of various expenditures out of respective institutional funds were checked thoroughly. It is seen that payments towards various expenditures against the under-noted funds are to be made, whose bills are attached herewith so as to meet up the expenditure made as per description:</p>
-            ${resTablesContent}
+            ${hasMain ? resTablesContent : ""}
+            ${mdmResContent}
             <div class="doc-footer" style="margin-top: 30px;">
                 <div>Prepared By:<br><br>____________________</div>
                 <div>Checked By:<br><br>____________________</div>
@@ -2032,7 +2083,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             </div>
             <div class="audit-footer"><span>Res No. ${resNoVal}</span><span>Page 2 of 4 — Resolution</span></div>
         </div>`;
-        container.innerHTML += page2;
+        pageList.push({ doc: 'resolution', html: page2 });
 
         // --- PAGE 3: HOI REPORT ---
         let hoiTablesContent = "";
@@ -2053,7 +2104,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
                 summary += `<tr style="background:#F7F9FC;"><td colspan="4" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):${fundReceiptNoteForGroup(items)}</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
             }
-            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="4" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
+            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="4" style="text-align:right;">${grandLabel}</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
             hoiTablesContent = `<table><colgroup><col style="width: 6%;"><col style="width: 24%;"><col style="width: 22%;"><col style="width: 32%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Payee Head</th><th>Fund HEAD / A/C No.</th><th>Audited Purpose Block</th><th class="text-right">Total (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;
         }
 
@@ -2069,6 +2120,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             </div>
             <p class="doc-body-text">As per the recommendations of the Finance Sub-Committee, payments are authorized to be executed to the respective payees whose transactional summaries are compiled below. All corresponding bills, vouchers, chequebooks, and the Cheque Issue Register have been audited and placed to pass for payment accordingly:</p>
             ${hoiTablesContent}
+            ${mdmExclNote}
             <div class="doc-footer" style="margin-top: 40px;">
                 <div>Verified Account Secretariat:<br><br>____________________</div>
                 <div>Sri Prabir Kumar Dangar<br>Head of Institution (HOI)</div>
@@ -2076,7 +2128,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             </div>
             <div class="audit-footer"><span>HOI Ref. ${hoiNoVal}</span><span>Page 3 of 4 — HOI Report</span></div>
         </div>`;
-        container.innerHTML += page3;
+        if (hasMain) pageList.push({ doc: 'hoi', html: page3 });
 
         // --- PAGE 4: ADMINISTRATOR APPROVAL ORDER ---
         let adminTablesContent = "";
@@ -2097,7 +2149,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 const fundTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
                 summary += `<tr style="background:#F7F9FC;"><td colspan="7" style="text-align:right;">Sub Total — ${fundName} (A/C: ${items[0].account}):${fundReceiptNoteForGroup(items)}</td><td class="text-right"><strong>₹${fundTotal.toFixed(2)}</strong></td></tr>`;
             }
-            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="7" style="text-align:right;">GRAND TOTAL (All Funds):</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
+            summary += `<tr style="background:#EAF0FF; font-weight:bold;"><td colspan="7" style="text-align:right;">${grandLabel}</td><td class="text-right">₹${grandTotal.toFixed(2)}</td></tr>`;
             adminTablesContent = `<table><colgroup><col style="width: 4%;"><col style="width: 16%;"><col style="width: 17%;"><col style="width: 13%;"><col style="width: 14%;"><col style="width: 10%;"><col style="width: 10%;"><col style="width: 16%;"></colgroup><thead><tr><th>Sl</th><th>Fund Head / A/C No.</th><th>Beneficiary</th><th>Purpose Reference</th><th>Cheque Type</th><th>Cheque No.</th><th>Issue Date</th><th class="text-right">Passed (₹)</th></tr></thead><tbody>${rows}${summary}</tbody></table>`;
         }
 
@@ -2114,6 +2166,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             </div>
             <p class="doc-body-text">As per the recommendations of the Finance Sub-Committee and the accompanying validation reports from the Head of the Institution (HOI), the following bank instruments/cheques are passed and approved for processing to the respective beneficiaries as explicitly stated within the fund allocations listed below:</p>
             ${adminTablesContent}
+            ${mdmExclNote}
             <div class="doc-footer" style="margin-top: 40px;">
                 <div>Prepared By:<br><br>____________________</div>
                 <div style="text-align: right; font-weight: bold;">
@@ -2124,7 +2177,13 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
             </div>
             <div class="audit-footer"><span>Admn Order No. ${adminNoVal}</span><span>Page 4 of 4 — Administrator Order</span></div>
         </div>`;
-        container.innerHTML += page4;
+        if (hasMain) pageList.push({ doc: 'admin', html: page4 });
+
+        // Number pages dynamically (HOI / Administrator pages are skipped when only MDM entries exist)
+        const totalPages = pageList.length;
+        container.innerHTML = pageList.map((pg, i) => pg.html
+            .replace('<div class="a4-page">', `<div class="a4-page" data-doc="${pg.doc}">`)
+            .replace(/Page \d of 4/, `Page ${i + 1} of ${totalPages}`)).join("");
 
         document.getElementById("masterDocumentSuite").style.display = "block";
         fitAllPages();
@@ -2140,6 +2199,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         const hoiNoVal = document.getElementById("metaHoiNo").value || "________";
         const adminOrderNo = document.getElementById("metaAdminNo").value || "________";
         const adminDateVal = formatDate(document.getElementById("metaAdminDate").value);
+        const resDateVal = formatDate(document.getElementById("metaResDate").value);
 
         for (let i = 0; i < sessionEntries.length; i += 2) {
             let pageWrapper = document.createElement("div");
@@ -2159,7 +2219,11 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                 const entry = sessionEntries[entryIndex];
                 const wordsAmt = numToWords(Math.floor(entry.amount));
                 const slNoVal = String(entryIndex + 1).padStart(2, '0');
-                const paymentOrderNo = `${resNoVal} / ${hoiNoVal} / ${adminOrderNo} / SL-${slNoVal}`;
+                const isMdm = isMDMEntry(entry);
+                // MDM: issued by the Finance Sub-Committee itself — no HOI / Administrator reference
+                const paymentOrderNo = isMdm
+                    ? `${resNoVal} / SL-${slNoVal}`
+                    : `${resNoVal} / ${hoiNoVal} / ${adminOrderNo} / SL-${slNoVal}`;
                 
                 let slipBlock = document.createElement("div");
                 slipBlock.className = "a4-slip-compressed";
@@ -2174,11 +2238,14 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                             <div class="slip-ref-line"><strong>Payment Order No:</strong> ${paymentOrderNo}</div>
                             <div class="slip-ref-grid">
                                 <div>Res No: <strong>${resNoVal}</strong></div>
-                                <div>HOI Report No: <strong>${hoiNoVal}</strong></div>
-                                <div>Admn Order No: <strong>${adminOrderNo}</strong></div>
+                                ${isMdm
+                                    ? `<div>Issued by: <strong>Finance Sub-Committee</strong></div>
+                                <div>Meeting Date: <strong>${resDateVal}</strong></div>`
+                                    : `<div>HOI Report No: <strong>${hoiNoVal}</strong></div>
+                                <div>Admn Order No: <strong>${adminOrderNo}</strong></div>`}
                                 <div>Sl No: <strong>${slNoVal}</strong></div>
                             </div>
-                            <div class="slip-ref-line" style="margin-top:3px;">Dated (as per Administrator Order): <strong>${adminDateVal}</strong></div>
+                            <div class="slip-ref-line" style="margin-top:3px;">${isMdm ? `Dated (as per Finance Sub-Committee Resolution): <strong>${resDateVal}</strong>` : `Dated (as per Administrator Order): <strong>${adminDateVal}</strong>`}</div>
                         </div>
                         
                         <div class="slip-row">
@@ -2203,7 +2270,7 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td>${entry.purpose}</td>
+                                    <td${isMdm ? ' contenteditable="true" title="Editable description"' : ''}>${entry.purpose}</td>
                                     <td><strong>${entry.chqType}</strong></td>
                                     <td><code>${entry.chqNo}</code></td>
                                     <td class="text-right" style="font-weight:bold;">₹${entry.amount}</td>
@@ -2213,8 +2280,11 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
                         </table>
 
                         <div class="doc-footer" style="margin-top:12px; padding-bottom: 5px;">
-                            <div>ADMINISTRATOR SIGN:<br><br>____________________</div>
-                            <div style="text-align:right;">HEADMASTER SIGN:<br><br>____________________</div>
+                            ${isMdm
+                                ? `<div>FINANCE SUB-COMMITTEE SIGN:<br><br>____________________</div>
+                            <div style="text-align:right;">HEADMASTER (CONVENOR) SIGN:<br><br>____________________</div>`
+                                : `<div>ADMINISTRATOR SIGN:<br><br>____________________</div>
+                            <div style="text-align:right;">HEADMASTER SIGN:<br><br>____________________</div>`}
                         </div>
                     </div>
 
@@ -2971,14 +3041,19 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
         compileConsolidatedSuite();
         const container = document.getElementById('suiteInnerContainer');
         const pages = container ? Array.from(container.querySelectorAll('.a4-page')) : [];
-        if (!pages[targetIndex]) {
-            alert('Could not prepare the selected document page.');
+        const targetPage = pages.find(pg => pg.getAttribute('data-doc') === type);
+        if (!targetPage) {
+            if (type === 'hoi' || type === 'admin') {
+                alert('No HOI Report / Administrator Order is needed for MDM entries — the Finance Sub-Committee sanctions the payment and issues the cheque itself. Select entries of other funds to generate this document.');
+            } else {
+                alert('Could not prepare the selected document page.');
+            }
             return;
         }
 
         // Copy the already-rendered NEW template page into a standalone print
         // window.  No historical template is used here.
-        const pageHtml = pages[targetIndex].outerHTML;
+        const pageHtml = targetPage.outerHTML;
         openLetterWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Selected Cheque Document</title><style>
             @page{size:A4;margin:0}html,body{margin:0;padding:0;background:#fff;color:#000}
             .a4-page{width:210mm;height:297mm;padding:18mm 19.05mm 16mm 19.05mm;box-sizing:border-box;
